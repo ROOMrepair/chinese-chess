@@ -31,6 +31,7 @@
 #pragma once
 
 #include "raylib.h"
+#include <stdio.h>
 
 #if defined(__cplusplus)
 extern "C" {            // Prevents name mangling of functions
@@ -47,6 +48,7 @@ extern "C" {            // Prevents name mangling of functions
     inline static bool SearchAndSetResourceDir(const char* folderName)
     {
         // check the working dir
+        printf("Working Dir: %s\n", GetWorkingDirectory());
         if (DirectoryExists(folderName))
         {
             ChangeDirectory(TextFormat("%s/%s", GetWorkingDirectory(), folderName));
@@ -54,6 +56,7 @@ extern "C" {            // Prevents name mangling of functions
         }
 
         const char* appDir = GetApplicationDirectory();
+        printf("App Dir: %s\n", appDir);
        
         // check the applicationDir
         const char* dir = TextFormat("%s%s", appDir, folderName);
