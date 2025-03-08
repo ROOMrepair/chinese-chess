@@ -1,38 +1,18 @@
 #pragma once
 
-#include "State.hpp"
 #include "Asset.hpp"
 #include "Board.hpp"
-#include "Piece.hpp"
 
-// 注意多态下的析构
-struct PieceState{
-	std::unique_ptr<Piece> p;
-	bool isDead;	
-	int x;
-	int y;
-};
-
-
-class GameState: public State
+class GameState
 {
-private:
 public:
-
-	bool isRedTurn;	
-	
-	PieceState BlackCamp[PieceCampNum];
-	PieceState RedCamp[PieceCampNum];
-
-	std::unique_ptr<Board> board;
+	Board board;
 
 	GameState();
 	~GameState();
 
-	
-
-	void renderScene() override;
-	void update() override;
+	void renderScene();
+	void update();
 };
 
 

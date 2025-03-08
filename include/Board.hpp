@@ -1,20 +1,28 @@
 #pragma once
 
+#include <cstring>
 #include "Asset.hpp"
-#include "raylib.h"
+#include "constant.hpp"
 
-const int P_WIDTH = 9;
-const int P_HEIGHT = 9;
+// 0 / 1 red / black
+inline int SIDE_TAG(int sd) {
+  return 16 + (sd << 4);
+}
 
 class Board{
 	public :
-		Board(int bIndex,int bgIndex);
+		Board();
 		~Board();
-		
-		int boardIndex;
-		int boardBgIndex;
 
+		bool isRedTurn;	
+		 
+  		uint8_t Squares[256]; // 每个格子放的棋子，0表示没有棋子
+  		uint8_t Pieces[48];   // 每个棋子放的位置，0表示被吃  16 - 47
+
+		bool loadFromFen(const char* szFen);
+		int PieceStrMap(char c);
 		void drawBoard(int x,int y);
-
-	private:
+		void clearBoard();
+					
 };
+

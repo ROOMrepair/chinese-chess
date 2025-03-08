@@ -15,56 +15,55 @@
 const int AssetCapacity = 128;
 const int PieceCampNum = 16;
 
-enum PieceType
-{
-	BING = 0,
-	PAO,
-	CHE,
-	MA,
-	XIANG,
-	SHI,
-	JIANG,
-};
+// enum PieceType
+// {
+// 	BING = 0,
+// 	PAO,
+// 	CHE,
+// 	MA,
+// 	XIANG,
+// 	SHI,
+// 	JIANG,
+// };
 
-enum Camp
-{
-	Red = 0,
-	Black,
-};
+// enum Camp
+// {
+// 	Red = 0,
+// 	Black,
+// };
 
-template <typename T>
-constexpr const char* EnumMap(T m_key) noexcept {
-    constexpr std::array<std::pair<T, const char*>, 7> PieceTypeStrings{{
-        {PieceType::BING, "BING"},
-        {PieceType::PAO, "PAO"},
-        {PieceType::CHE, "CHE"},
-        {PieceType::MA, "MA"},
-        {PieceType::XIANG, "XIANG"},
-        {PieceType::SHI, "SHI"},
-        {PieceType::JIANG, "JIANG"}
-    }};
+// template <typename T>
+// constexpr const char* EnumMap(T m_key) noexcept {
+//     constexpr std::array<std::pair<T, const char*>, 7> PieceTypeStrings{{
+//         {PieceType::BING, "BING"},
+//         {PieceType::PAO, "PAO"},
+//         {PieceType::CHE, "CHE"},
+//         {PieceType::MA, "MA"},
+//         {PieceType::XIANG, "XIANG"},
+//         {PieceType::SHI, "SHI"},
+//         {PieceType::JIANG, "JIANG"}
+//     }};
+//     constexpr std::array<std::pair<Camp, const char*>, 2> CampStrings{{
+//         {Camp::Red, "RED"},
+//         {Camp::Black, "BLACK"}
+//     }};
 
-    constexpr std::array<std::pair<Camp, const char*>, 2> CampStrings{{
-        {Camp::Red, "RED"},
-        {Camp::Black, "BLACK"}
-    }};
+//     if constexpr (std::is_same_v<T, PieceType>) {
+//         for (const auto& [k, v] : PieceTypeStrings) {
+//             if (k == m_key) return v;
+//         }
+//     }
+//     else if constexpr (std::is_same_v<T, Camp>) {
+//         for (const auto& [k, v] : CampStrings) {
+//             if (k == m_key) return v;
+//         }
+//     } 
 
-    if constexpr (std::is_same_v<T, PieceType>) {
-        for (const auto& [k, v] : PieceTypeStrings) {
-            if (k == m_key) return v;
-        }
-    }
-    else if constexpr (std::is_same_v<T, Camp>) {
-        for (const auto& [k, v] : CampStrings) {
-            if (k == m_key) return v;
-        }
-    } 
+//     return "";
+// }
 
-    return "";
-}
-
-inline const char* BOARD = "BOARD";
-inline const char* BOARD_BG = "BOARD_BG";
+// inline const char* BOARD = "BOARD";
+// inline const char* BOARD_BG = "BOARD_BG";
 
 struct PieceTexture{
     std::string id;

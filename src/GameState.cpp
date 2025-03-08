@@ -3,7 +3,7 @@
 
 GameState::GameState()
 {
-	board = std::make_unique<Board>(BOARD_INDEX,BOARD_BG_INDEX);
+
 }
 
 GameState::~GameState()
@@ -13,7 +13,7 @@ GameState::~GameState()
 
 void GameState::renderScene()
 {
-	board->drawBoard(0,0);
+	board.drawBoard(0,0);
 	// drawPieces();
 }
 
