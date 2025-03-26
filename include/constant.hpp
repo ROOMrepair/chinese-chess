@@ -2,20 +2,28 @@
 
 #include "raylib.h"
 
-// screen render info 
+// screen render
 const int SCREEN_WIDTH = 800;
 const int SCREEN_HEIGHT = 600;
 
-const int BOARD_PADDING_X = 20;
-const int BOARD_PADDING_Y = 20;
-const int BOARD_BG_PADDING_X = 0;
+// notify
+
+
+// board render
+const int BOARD_PADDING_X = 40;
+const int BOARD_PADDING_Y = 40;
 const int BOARD_BORDER_WIDTH = 10;
 
-Color BOARD_LINE_COLOR = {171,93,22,255};
-Color BORDER_COLOR = {218,185,151,255};
+const Color BOARD_LINE_COLOR = {171,93,22,255};
+const Color BORDER_COLOR = {218,185,151,255};
 
-const int P_WIDTH = 10;
-const int P_HEIGHT = 9;
+// piece
+const Color RING_COLOR_Purple = {175, 45, 245, 255};
+const Color RING_COLOR_Orange = {245, 45, 45, 255};
+
+// board info
+const int B_WIDTH = 9;
+const int B_HEIGHT = 10;
 
 const int KING_TYPE = 0;
 const int ADVISOR_TYPE = 1;
@@ -25,7 +33,6 @@ const int ROOK_TYPE = 4;
 const int CANNON_TYPE = 5;
 const int PAWN_TYPE = 6;
 
-// piece 数组索引位置
 const int KING = 0;
 const int ADVISOR_FROM = 1;
 const int ADVISOR_TO = 2;
@@ -40,45 +47,18 @@ const int CANNON_TO = 10;
 const int PAWN_FROM = 11;
 const int PAWN_TO = 15;
 
-const char *const cszStartFen = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w";
+// 大写为 red 
+// init: "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r";
+const char *const cszStartFen = "1nbakab1r/r8/1c5c1/p1p3p1p/9/4p1n2/P1P1P1P1P/1C5C1/7N1/RNBAKAB1R r";
 
 const char *const cszPieceBytes = "KABNRCP";
 
-const bool cbcInBoard[256] = {
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
-  0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
-  0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
-  0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
-  0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
-  0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
-  0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
-  0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
-  0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
-  0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-};
+const int rowOffset = 3;
+const int colOffset = 3;
+const int rowOffsetTo = rowOffset + B_HEIGHT;
+const int colOffsetTo = colOffset + B_WIDTH;
 
-const bool cbcInFort[256] = {
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-};
 
+inline Color PIECE_COLOR(int pt){
+	return (pt & (1 << 5)) ? BLACK : RED;
+}

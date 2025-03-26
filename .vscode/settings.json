@@ -67,6 +67,8 @@
 		"typeinfo": "cpp",
 		"variant": "cpp",
 		"fstream": "cpp",
-		"ios": "cpp"
+		"ios": "cpp",
+		"cstring": "cpp",
+		"*.m": "cpp"
 	}
 }

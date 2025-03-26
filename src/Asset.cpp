@@ -1,5 +1,9 @@
 #include "Asset.hpp"
 
+bool Asset::loadFont(){
+	
+}
+
 bool Asset::loadAssets(const char *assetsDir, const char *fileName)
 {
 	std::ifstream conf_fs(fileName, std::fstream::in);
