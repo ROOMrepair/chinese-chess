@@ -2,6 +2,9 @@
 
 #include "raylib.h"
 
+// font 
+const int DEFAULT_FONT_SIZE = 32;
+
 // screen render
 const int SCREEN_WIDTH = 800;
 const int SCREEN_HEIGHT = 600;
@@ -49,7 +52,7 @@ const int PAWN_TO = 15;
 
 // 大写为 red 
 // init: "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r";
-const char *const cszStartFen = "1nbakab1r/r8/1c5c1/p1p3p1p/9/4p1n2/P1P1P1P1P/1C5C1/7N1/RNBAKAB1R r";
+const char *const cszStartFen = "1nbakab1r/9/1c5c1/p1p3p1p/9/4p1n2/P1P1P1P1P/1Cr4C1/7N1/RNBAKAB1R r";
 
 const char *const cszPieceBytes = "KABNRCP";
 

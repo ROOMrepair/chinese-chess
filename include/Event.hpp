@@ -39,6 +39,9 @@ public:
 
 	Vector2 lastClickPos;
 
+	Vector2 dragStartPos;
+	Vector2 dragMousePos;
+
 	OnClick onClick;
 	OnDrag onDrag;
 	OnRelease onRelease;

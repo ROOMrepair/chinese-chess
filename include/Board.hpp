@@ -50,14 +50,17 @@ struct BoardInfo
 	float BoardOriginY = 0;
 };
 
+class GameState; 
 class Board
 {
 public:
-	Board(bool isredside);
+	Board(GameState &st,bool isredside);
 	~Board();
 
-	bool isRedTurn;
-	bool isRedSide;
+	GameState &gameState;
+
+	bool isRedTurn; // 回合
+	bool isRedSide; // 执子方
 	bool isExchangeSide;
 
 	BoardInfo binfo;
@@ -92,11 +95,23 @@ public:
 	void drawPieces(bool isDragging = false);
 	void drawMarker(bool isDragging = false);
 	Vector2 screenXY(int x,int y);
-	// void filpBoard();
 	
-	// 
-	void move();	
+	// move
+// 每一次移动前/后需要进行检查(move event release->move)
+// pre:
+// 1.被将军检测，是否会造成/已造成本方被将军，会则禁止移动，并提示
+// post:
+// 1. 将军检测，对两侧的将都需要检测,检测后需要对目前所有的将军线路进行判断，是否能够通过移动阻隔脱离将军状态
+// 
+// (如果没有这样的一条线路)
+//
+	void move(int sqSrc,int sqDst);	
+	void capture();
 	void pieceCap(int pt,int pos,std::function<void(int,int)> cb);
+	void ClickToMove(); // use dragstartpos and dragmovepos
+	void DragToMove();
+	void changeSide();
+	void unDo();
 
 	//  debug
 	void printPieces();

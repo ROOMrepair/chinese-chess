@@ -1,6 +1,6 @@
 #include "Board.hpp"
 
-Board::Board(bool isredside)
+Board::Board(GameState& st,bool isredside):gameState(st)
 {
 	this->isRedTurn = true;
 	this->isRedSide = isredside;
@@ -276,6 +276,12 @@ bool Board::caculateBoardInfo()
 	return true;
 }
 
+Vector2 Board::screenXY(int x,int y){
+	float cx = this->binfo.BoardOriginX + x * this->binfo.gridWidth;
+	float cy = this->binfo.BoardOriginY + y * this->binfo.gridHeight;
+	return (Vector2){cx,cy};	
+}
+
 void Board::drawBackground()
 {
 	auto &asset = Asset::getInstance();
@@ -299,10 +305,13 @@ void Board::drawBackground()
 
 void Board::drawPieces(bool isDragging)
 {
+	// 激活的点位
 	if(isDragging && activatedPos.x != -1 && activatedPos.y != -1){
 		Vector2 activePiece = screenXY(activatedPos.x,activatedPos.y);
 		DrawCircleV(activePiece, 10, {66,133,244,255});
 	}
+
+	float activeCircleX,activeCircleY,activeTx,activeTy;
 
 	auto &asset = Asset::getInstance();
 	for (int i = 0; i < B_HEIGHT; ++i)
@@ -326,10 +335,17 @@ void Board::drawPieces(bool isDragging)
 					// 棋子跟随鼠标移动
 					circieX += dragMousePos.x - dragStartPos.x;
 					circieY += dragMousePos.y - dragStartPos.y;
+
+					activeCircleX = circieX;
+					activeCircleY = circieY;
+
+					activeTx = circieX - cx;
+					activeTy = circieY - cy;
 				}
 				// texture rect 左上角
 				float tx = circieX - cx;
 				float ty = circieY - cy;
+				
 				DrawCircleV(
 					{circieX, circieY},
 					this->binfo.radius,
@@ -343,12 +359,16 @@ void Board::drawPieces(bool isDragging)
 			}
 		}
 	}
-}
 
-Vector2 Board::screenXY(int x,int y){
-	float cx = this->binfo.BoardOriginX + x * this->binfo.gridWidth;
-	float cy = this->binfo.BoardOriginY + y * this->binfo.gridHeight;
-	return (Vector2){cx,cy};	
+	if(isDragging && activatedPos.x != -1 && activatedPos.y != -1){
+		int pt = Squares[SQpos(activatedPos.y,activatedPos.x)];
+		Color c = PIECE_COLOR(pt);
+		auto &p_texture = asset.pieceTextures[Pieces[pt].textureIndex].texture;
+
+		DrawCircleV({activeCircleX, activeCircleY}, this->binfo.radius, c);
+		DrawTextureEx(p_texture, {activeTx,activeTy}, 0, this->binfo.pieceScale, WHITE);
+ 	}
+
 }
 
 
@@ -386,17 +406,9 @@ void Board::drawMarker(bool isDragging)
 	}
 }
 
-// 每一次移动前/后需要进行检查(move event release->move)
-// pre:
-// 1.被将军检测，是否会造成本方被将军，会则禁止移动，并提示
-// post:
-// 1. 将军检测，对两侧的将都需要检测,检测后需要对目前所有的将军线路进行判断，是否能够通过移动阻隔脱离将军状态
-// (如果没有这样的一条线路)
-//
 void Board::pieceCap(int pt,int pos,std::function<void(int,int)> cb)
 {
-	static int d = 0;
-	int i,bx,by,col_mask,row_mask,p;
+	int i,bx,by,col_mask,row_mask,p,j;
 	SlideMoveStruct col_move,row_move;
 
 	switch (pt & 0x0f)
@@ -458,28 +470,38 @@ void Board::pieceCap(int pt,int pos,std::function<void(int,int)> cb)
 
 		// col move	
 		for(p = col_move.SlideMove[1] - rowOffset; p <= by - 1 ;++p){
-			// DrawCircleV(screenXY(bx,p),5,RING_COLOR_Purple);	
 			cb(bx,p);
 		}
 		
 		for(p = by + 1; p <= col_move.SlideMove[0] - rowOffset;++p){
-			// DrawCircleV(screenXY(bx,p),5,RING_COLOR_Purple);	
 			cb(bx,p);
 		}
 		
 		// row move
 		for(p = row_move.SlideMove[1] - colOffset; p <= bx - 1;++p){
-			// DrawCircleV(screenXY(p,by),5,RING_COLOR_Purple);	
 			cb(p,by);
 		}
 		
 		for(p = bx + 1 ; p <= row_move.SlideMove[0] - colOffset;++p){
-			// DrawCircleV(screenXY(p,by),5,RING_COLOR_Purple);	
 			cb(p,by);
 		}
 
-		// cap
-		
+		// cap col
+		for(j = 0;j < 2;++j){
+			p = col_move.RookCap[j] - rowOffset;
+			if( p >= 0){
+				cb(bx,p);		
+			}
+		}
+
+		// cap row
+		for(j = 0;j < 2;++j){
+			p = row_move.RookCap[j] - colOffset;
+			if( p >= 0){
+				cb(p,by);		
+			}
+		}
+
 		break;
 	case CANNON_FROM ... CANNON_TO:
 		bx = FILE_X(pos) - colOffset;
@@ -491,25 +513,38 @@ void Board::pieceCap(int pt,int pos,std::function<void(int,int)> cb)
 
 		// col move	
 		for(p = col_move.SlideMove[1] - rowOffset; p <= by - 1 ;++p){
-			// DrawCircleV(screenXY(bx,p),5,RING_COLOR_Purple);	
 			cb(bx,p);
 		}
 		
 		for(p = by + 1; p <= col_move.SlideMove[0] - rowOffset;++p){
-			// DrawCircleV(screenXY(bx,p),5,RING_COLOR_Purple);	
 			cb(bx,p);
 		}
 		
 		// row move
 		for(p = row_move.SlideMove[1] - colOffset; p <= bx - 1;++p){
-			// DrawCircleV(screenXY(p,by),5,RING_COLOR_Purple);	
 			cb(p,by);
 		}
 		
 		for(p = bx + 1 ; p <= row_move.SlideMove[0] - colOffset;++p){
-			// DrawCircleV(screenXY(p,by),5,RING_COLOR_Purple);	
 			cb(p,by);
 		}
+
+		// cap col
+		for(j = 0;j < 2;++j){
+			p = col_move.CannonCap[j] - rowOffset;
+			if( p >= 0){
+				cb(bx,p);		
+			}
+		}
+
+		// cap row
+		for(j = 0;j < 2;++j){
+			p = row_move.CannonCap[j] - colOffset;
+			if( p >= 0){
+				cb(p,by);		
+			}
+		}
+
 		break;
 	case PAWN_FROM ... PAWN_TO:
 		i = 0;
@@ -518,14 +553,12 @@ void Board::pieceCap(int pt,int pos,std::function<void(int,int)> cb)
 			if(pt & (1 << 5)){
 				while(PawnMoves[1][pos][i] != 0){
 					int x = BOARD_X(PawnMoves[1][pos][i]),y = BOARD_Y(PawnMoves[1][pos][i]);
-					// DrawCircleV(screenXY(x,y), 5, RING_COLOR_Purple);			
 					cb(x,y);
 					i++;
 				}
 			}else{
 				while(PawnMoves[0][pos][i] != 0){
 					int x = BOARD_X(PawnMoves[0][pos][i]),y = BOARD_Y(PawnMoves[0][pos][i]);
-					// DrawCircleV(screenXY(x,y), 5, RING_COLOR_Purple);			
 					cb(x,y);
 					i++;
 				}
@@ -535,14 +568,12 @@ void Board::pieceCap(int pt,int pos,std::function<void(int,int)> cb)
 			if(pt & (1 << 5)){
 				while(PawnMoves[0][pos][i] != 0){
 					int x = BOARD_X(PawnMoves[0][pos][i]),y = BOARD_Y(PawnMoves[0][pos][i]);
-					// DrawCircleV(screenXY(x,y), 5, RING_COLOR_Purple);			
 					cb(x,y);
 					i++;
 				}
 			}else{
 				while(PawnMoves[1][pos][i] != 0){
 					int x = BOARD_X(PawnMoves[1][pos][i]),y = BOARD_Y(PawnMoves[1][pos][i]);
-					// DrawCircleV(screenXY(x,y), 5, RING_COLOR_Purple);			
 					cb(x,y);
 					i++;
 				}
@@ -559,7 +590,7 @@ void Board::printPieces()
 {
 	for (int i = 0; i < 48; ++i)
 	{
-		DEBUG_("%d ", Pieces[i].textureIndex);
+		DEBUG_(Pieces[i].textureIndex);
 	}
 	DEBUG_("\n");
 }
@@ -590,17 +621,22 @@ void Board::printBoard()
 
 bool Board::checkClickActivation(Vector2 pos, BoardPos &bp)
 {
+
 	for (int i = 0; i < B_HEIGHT; ++i)
 	{
 		for (int j = 0; j < B_WIDTH; ++j)
 		{
 			int piece_i = Squares[16 * (i + rowOffset) + j + colOffset];
-			if (piece_i & 63)
+			if (piece_i & 63) //? 
 			{
 				float cx = this->binfo.BoardOriginX + j * this->binfo.gridWidth;
 				float cy = this->binfo.BoardOriginY + i * this->binfo.gridHeight;
 				if (CheckCollisionPointCircle(pos, {cx, cy}, this->binfo.radius))
 				{
+					//! silly 
+					if(((piece_i & (1 << 5)) && !isRedTurn) || (!(piece_i & (1 << 5)) && isRedTurn)){
+						return false;	
+					}
 					bp.x = j;
 					bp.y = i;
 					return true;
@@ -613,7 +649,55 @@ bool Board::checkClickActivation(Vector2 pos, BoardPos &bp)
 	return false;
 }
 
-void Board::handleDragEvent(Vector2 pos)
-{
-	// this->dragMousePos = pos;
+void Board::changeSide(){
+	this->activatedPos.x = -1;
+	this->activatedPos.y = -1;
+	this->isRedTurn = !this->isRedTurn;	
+}
+
+void Board::move(int sqSrc,int sqDst){
+	DEBUG_("move",sqSrc,sqDst);
+
+	wBitCols[FILE_X(sqSrc)] ^= ColMask(sqSrc);
+	wBitRows[RANK_Y(sqSrc)] ^= RowMask(sqSrc);
+
+
+	wBitCols[FILE_X(sqDst)] ^= ColMask(sqDst);
+	wBitRows[RANK_Y(sqDst)] ^= RowMask(sqDst);
+}
+
+void Board::ClickToMove(){
+	if (activatedPos.x != -1 && activatedPos.y != -1)
+	{
+		int pos = SQpos(activatedPos.y,activatedPos.x);
+		int pt = Squares[pos];
+
+		// 检测目标点，和每一个目标点检测
+		pieceCap(pt,pos,[this](int bx,int by){
+
+			float cx = this->binfo.BoardOriginX + bx * this->binfo.gridWidth;
+			float cy = this->binfo.BoardOriginY + by * this->binfo.gridHeight;
+			if (CheckCollisionPointCircle(this->dragMousePos, {cx, cy}, this->binfo.radius)){
+				int sqSrc = SQpos(activatedPos.y,activatedPos.x);
+				int sqDst = SQpos(by, bx);					
+
+				int sqSrcPiece = Squares[sqSrc];
+				int sqDstPiece = Squares[sqDst];
+	
+				if(sqDstPiece == 0){
+					// move
+					move(sqSrc,sqDst);
+				}else if((sqDstPiece & ( 1 << 5)) != (sqSrcPiece & (1 << 5))){
+					DEBUG_("eat",sqSrc,sqDst);
+					// eat
+					// DrawCircleV(screenXY(bx,by), 5, GREEN);			
+				}
+			}
+
+		});
+	}
+}
+
+void Board::DragToMove(){
+
 }

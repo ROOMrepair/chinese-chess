@@ -7,7 +7,7 @@
 #include <cassert>
 
 #ifndef DEBUG_
-	#define DEBUG_(...) debugPrint(__VA_ARGS__)
+	#define DEBUG_(...) DebugPrint(__VA_ARGS__)
 #endif
 
 
@@ -30,13 +30,20 @@ inline void trim(std::string &s)
 	rtrim(s);
 }
 
-inline void debugPrint(const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-	std::cout << "\033[32m";
-    vprintf(format, args); // 使用 vprintf 格式化输出
-	std::cout << "\033[0m";
-    va_end(args);
+template <typename T>
+void debugPrint(const T& t){
+	std::cout << t;
 }
 
+template <typename T,typename... Args>
+void debugPrint(const T& t,const Args&... rest){
+	std::cout << t << " ";
+	debugPrint(rest...);
+}
 
+template <typename... Args>
+inline void DebugPrint(const Args& ...args){
+	std::cout << "\033[32m";
+	debugPrint(args...);
+	std::cout << "\033[0m" << std::endl;
+}

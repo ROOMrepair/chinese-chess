@@ -1,7 +1,27 @@
 #include "GameState.hpp"
 
 GameState::GameState(MouseClickState &m,bool isRedSide):
-	mcs(m),board(isRedSide){
+	mcs(m),board(*this,isRedSide){
+
+	// init buttons 
+	//
+	auto &bm = ButtonManager::getInstance();	
+	Button changeButton({700,100},"交换");
+	changeButton.bindOnClick([this](){
+		DEBUG_("交换");
+		this->board.changeSide();
+	});
+
+	Button undoButton({700,200},"悔棋");
+	undoButton.bindOnClick([this](){
+		DEBUG_("悔棋");
+	});
+
+	bm.Add(std::move(changeButton));
+	bm.Add(std::move(undoButton));
+
+
+	// bind mouse event
 	mcs.bindOnClick([this](MouseStateType pre, Vector2 pos){
 		this->board.dragMousePos = pos;
 		BoardPos bp;	
@@ -20,13 +40,13 @@ GameState::GameState(MouseClickState &m,bool isRedSide):
 				if(this->board.activatedPos.x == bp.x && this->board.activatedPos.y == bp.y){
 					this->mcs.state = MouseStateType::checkDragFromSelected;
 				}else{
-					// 选中新棋子，类似 idle 操作 
 					this->board.activatedPos = bp;	
 					this->mcs.state = MouseStateType::CheckDragFromIdle;
 				}
 			}
 		}else{
 			// todo 检查点击是否是目标点位 	
+			this->board.ClickToMove();	
 		}
 	});
 	mcs.bindOnDrag([this](MouseStateType pre,Vector2 pos){
@@ -45,7 +65,7 @@ GameState::GameState(MouseClickState &m,bool isRedSide):
 			}
 			this->mcs.state = MouseStateType::Dragging;
 		}else if(pre == MouseStateType::Dragging){
-			this->board.handleDragEvent(pos);
+			// this->board.handleDragEvent(pos);
 		}
 	});
 	mcs.bindOnRelease([this](MouseStateType pre ,Vector2 pos){
@@ -71,10 +91,8 @@ void GameState::renderScene()
 	board.drawMarker(isDragging);
 }
 
-void GameState::update()
+void GameState::update(Vector2 pos)
 {
-
-	Vector2 pos = GetMousePosition();
 	if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)){
 		mcs.handleEvent(MouseEventType::Click,pos);
 	}

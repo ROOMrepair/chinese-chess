@@ -1,5 +1,17 @@
 #include <iostream>
 
+#if defined(_WIN32)           
+
+	#define NOGDI             // All GDI defines and routines
+	#define NOUSER            // All USER defines and routines
+
+	#define MMNOSOUND
+
+	typedef struct tagMSG *LPMSG;						  
+	#include <windows.h>
+
+#endif
+
 #include "raylib.h"
 #include "resource_dir.hpp" // utility header for SearchAndSetResourceDir
 #include "GameState.hpp"
@@ -14,8 +26,13 @@ const char *conf_file = "./resources/source.conf";
 
 int main()
 {
+
+	DEBUG_("Hello Raylib",1,3.13,"\n");
+
+	SetConsoleOutputCP(CP_UTF8);
+
 	// signal handler
-	DEBUG_("Hello Raylib\n");
+	
 	// Tell the window to use vsync and work on high DPI displays
 	SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
 
@@ -54,20 +71,25 @@ int main()
 	while (!WindowShouldClose())
 	{
 		float frameTime = GetFrameTime();
+		Vector2 pos = GetMousePosition();
 		
-		if(IsKeyPressed('N')){
-			NotifyManager::getInstance().Add(
-				{
-					"此处是一个非法目标",
-				});
-		}
+		// if(IsKeyPressed('N')){
+		// 	NotifyManager::getInstance().Add(
+		// 		{
+		// 			u8"此处是一个非法目标",
+		// 		});
+		// }
 
-		gst.update();
+		gst.update(pos);
+		ButtonManager::getInstance().Update(pos);
 		NotifyManager::getInstance().Update(frameTime);
 
 		BeginDrawing();
+
 		gst.renderScene();
+		ButtonManager::getInstance().Draw();
 		NotifyManager::getInstance().Draw();
+
 		EndDrawing();
 	}
 

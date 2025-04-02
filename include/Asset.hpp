@@ -3,28 +3,40 @@
 #include "raylib.h"
 #include "resource_dir.hpp"
 #include <array>
-#include <memory>
 #include <iostream>
 #include <string>
 #include <fstream>
 #include <string>
 #include <cstdlib>
+#include <vector>
+
 #include "util.hpp"
 #include "piece_index.hpp"
+#include "constant.hpp"
 
 const int AssetCapacity = 128;
-const int PieceCampNum = 16;
+const int FontCapacity = 5;
+
+enum class ResourceType{
+    IMAGE,
+    FONT,
+    UNKNOWN
+};
 
 struct PieceTexture{
     std::string id;
     Texture2D texture;
 };
 
+struct FontTexture{
+    std::string id;
+    Font font;
+};
+
 class Asset
 {
 private:
-    Asset(): assetNum(0){}; 
-    int assetNum;
+    Asset(): assetNum(0),fontNum(0){}; 
 
 public:
     static Asset& getInstance()
@@ -38,19 +50,19 @@ public:
     // 禁用拷贝构造函数和赋值运算符
     Asset(const Asset&) = delete;
     Asset& operator=(const Asset&) = delete;
-   
-    int getNum(){ return assetNum; }
 
     ~Asset()
     {
-
         std::cout << "asset destroyed" << std::endl;
         unloadAssets();
     }
 
     std::array<PieceTexture, AssetCapacity> pieceTextures;
+    std::array<FontTexture,FontCapacity> fonts;
 		
+    int assetNum;
+    int fontNum;
+
 	bool loadAssets(const char* assetDir,const char* fileName);
-    bool loadFont();
 	void unloadAssets(); 
 };

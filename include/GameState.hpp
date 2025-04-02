@@ -3,6 +3,7 @@
 #include "Asset.hpp"
 #include "Board.hpp"
 #include "Event.hpp"
+#include "Button.hpp"
 
 class GameState
 {
@@ -16,7 +17,10 @@ public:
 	};
 	
 	void renderScene();
-	void update();
+	void update(Vector2 pos);
+	
+	// game
+	void SaveBoard();
 };
 
 
