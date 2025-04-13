@@ -10,12 +10,12 @@ struct Notify
 {
     std::string msg;
     // Vector2 position;
-    Color color;
+    Color color = {0, 0, 0, 255};
 
-    int fontSize = DEFAULT_FONT_SIZE;
+    int fontSize = 16;
     float spacing = 0;
-    float paddingLR = 50.0f;
-    float paddingTB = 20.0f;
+    float paddingLR = 20.0f;
+    float paddingTB = 10.0f;
 
     float duration = 4.0f;
     float timer = 0;
@@ -40,10 +40,10 @@ struct Notify
         float w = textSize.x + 2 * paddingLR;
         float h = textSize.y + 2 * paddingTB;
         float x = SCREEN_WIDTH - w - 20;
-        float y = id * (h + 10) + 10;
-
+        // float y = id * (h + 10) + 10;
+        float y = SCREEN_HEIGHT - h - 10 - id * (h + 10) - 10;
         DrawRectangleRounded({x, y, w, h}, 0.1f, 4, {255, 255, 255, (unsigned char)(255 * alpha)});
-        DrawTextEx(font,msg.c_str(),{x + (w - textSize.x) * 0.5f, y + (h - textSize.y) * 0.5f}, fontSize, spacing, { 0, 0, 0, (unsigned char)(255 * alpha) });
+        DrawTextEx(font,msg.c_str(),{x + (w - textSize.x) * 0.5f, y + (h - textSize.y) * 0.5f}, fontSize, spacing, { color.r, color.g, color.b, (unsigned char)(color.a * alpha) });
     }
 
     void Update(float deltaTime)
@@ -68,8 +68,8 @@ class NotifyManager
 {
 private:
     std::vector<Notify> notifications;
-    int size;
-    NotifyManager() : size(10) {};
+    size_t size;
+    NotifyManager() : size(6) {};
 
 public:
     NotifyManager(const NotifyManager &) = delete;
@@ -83,7 +83,7 @@ public:
         return instance;
     }
 
-    int getSize() const { return size; };
+    size_t getSize() const { return size; };
 
     void Add(Notify&& notify)
     {
@@ -110,7 +110,7 @@ public:
 
     void Draw()
     {
-        for (int i = 0; i < notifications.size(); ++i)
+        for (size_t i = 0; i < notifications.size(); ++i)
         {
             const auto &notif = notifications[i];
             notif.Draw(i);

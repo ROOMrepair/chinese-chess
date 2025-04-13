@@ -8,6 +8,12 @@
 const char *conf_file = "./resources/source.conf";
 const char *conf_file_index = "./include/piece_index.hpp";
 
+enum class ResourceType{
+    IMAGE,
+    FONT,
+    UNKNOWN
+};
+
 int main()
 {
 	std::ifstream conf_fs(conf_file);
@@ -29,10 +35,30 @@ int main()
 
 	char line[1024];
 	int assetNum = 0;
+	auto currentType = ResourceType::UNKNOWN;	
 
 	while (conf_fs.getline(line, 1024))
 	{
 		std::string conf_line(line);
+		// add type filter
+		if(conf_line.empty()){
+			continue;	
+		}	
+		
+		if(conf_line.rfind("TYPE=") == 0){
+			std::string typeSign = conf_line.substr(5);
+			if(typeSign == "IMAGE"){
+				currentType = ResourceType::IMAGE;
+			}else if(typeSign == "FONT"){
+				currentType = ResourceType::FONT;
+			}else{
+				currentType = ResourceType::UNKNOWN;
+  				std::cerr << "Unknown resource type: " << typeSign << std::endl;
+				return false;
+			}
+			continue;
+		}
+
 		size_t deilm_pos = conf_line.find(':');
 
 		std::string name = conf_line.substr(0, deilm_pos);
@@ -43,8 +69,10 @@ int main()
 
 		std::cout << "name: " << name << " path: " << path << std::endl;
 
-		conf_fs_out << "#define " << name << "_INDEX " << assetNum << "\n";
-		assetNum += 1;
+		if(currentType == ResourceType::IMAGE){
+			conf_fs_out << "#define " << name << "_INDEX " << assetNum << "\n";
+			assetNum += 1;
+		}
 	}
 
 	if (conf_fs.bad() || (conf_fs.fail() && !conf_fs.eof()))

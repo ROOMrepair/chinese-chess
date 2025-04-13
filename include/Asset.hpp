@@ -46,7 +46,6 @@ public:
 		return instance;
     }
 
-
     // 禁用拷贝构造函数和赋值运算符
     Asset(const Asset&) = delete;
     Asset& operator=(const Asset&) = delete;

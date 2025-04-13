@@ -38,6 +38,78 @@ const bool cbcInFort[256] = {
   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
 
+const int8_t ccLegalSpanTab[512] = {
+                       0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 2, 1, 2, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 2, 1, 2, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0, 0, 0
+};
+
+const int8_t ccKnightPinTab[512] = {
+                               0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,-16,  0,-16,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0, -1,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0, -1,  0,  0,  0,  1,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0, 16,  0, 16,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
+   0,  0,  0,  0,  0,  0,  0
+};
+
 static const int KingMoveTab[4]    = {-0x10, -0x01, +0x01, +0x10};
 static const int AdvisorMoveTab[4] = {-0x11, -0x0f, +0x0f, +0x11};
 static const int BishopMoveTab[4]  = {-0x22, -0x1e, +0x1e, +0x22};
@@ -45,18 +117,21 @@ static const int BishopMoveTab[4]  = {-0x22, -0x1e, +0x1e, +0x22};
 static const int KnightMoveTab[8]  = {-0x21, -0x1f, -0x12, -0x0e, +0x0e, +0x12, +0x1f, +0x21};
 static const int KnightPinTabs[8]  = {-0x10, -0x10, -0x01, +0x01, -0x01, +0x01, +0x10, +0x10};
 
-SlideMoveStruct SlideMoveCol[10][1024] = {0};
-SlideMoveStruct SlideMoveRow[9][512] = {0};
+SlideMoveStruct SlideMoveCol[10][1024] = {};
+SlideMoveStruct SlideMoveRow[9][512] = {};
 
-uint8_t KnightMoves[256][12] = {0};
-uint8_t KnightPins[256][8] = {0};
+SlideMaskStruct SlideMaskCol[10][1024] = {};
+SlideMaskStruct SlideMaskRow[9][512] = {};
 
-uint8_t BishopMoves[256][8] = {0};
-uint8_t BishopPins[256][4] = {0};
+uint8_t KnightMoves[256][12] = {};
+uint8_t KnightPins[256][8] = {};
 
-uint8_t KingMoves[256][8] = {0};
-uint8_t AdvisorMoves[256][8] = {0};
-uint8_t PawnMoves[2][256][4] = {0};
+uint8_t BishopMoves[256][8] = {};
+uint8_t BishopPins[256][4] = {};
+
+uint8_t KingMoves[256][8] = {};
+uint8_t AdvisorMoves[256][8] = {};
+uint8_t PawnMoves[2][256][4] = {};
 
 void genShortRangeMove(){
   int sqSrc,sqDst,n,i,j;
@@ -147,20 +222,25 @@ void genLongRangeMove(){
       SlideMoveCol[i][j].SlideMove[0] = SlideMoveCol[i][j].CannonCap[1] = 
       SlideMoveCol[i][j].RookCap[1] = SlideMoveCol[i][j].SlideMove[1] = i + rowOffset;
 
+      SlideMaskCol[i][j].wNonCap = SlideMaskCol[i][j].wRookCap = SlideMaskCol[i][j].wCannonCap = 0;
+
       // i = 0 第一行  0000010001 
       //? 不用管 sq 原始位 j = 000010001 或 000010101 时对应的值是一样的
       // down 
       for(k = i + 1; k < 10; ++k){
         if((1 << k) & j){
           SlideMoveCol[i][j].RookCap[0] = rowOffset + k;
+          SlideMaskCol[i][j].wRookCap |= (1 << k);
           break; 
         }
         SlideMoveCol[i][j].SlideMove[0] = rowOffset + k;
+        SlideMaskCol[i][j].wNonCap |= (1 << k);
       }
       
       for(k = k + 1; k < 10; ++k){
         if((1 << k) & j){
           SlideMoveCol[i][j].CannonCap[0] = rowOffset + k;
+          SlideMaskCol[i][j].wCannonCap |= (1 << k);
           break;
         }
       }
@@ -169,14 +249,17 @@ void genLongRangeMove(){
       for(k = i - 1; k >= 0 ;--k){
         if((1 << k) & j){
           SlideMoveCol[i][j].RookCap[1] = rowOffset + k;
+          SlideMaskCol[i][j].wRookCap |= (1 << k);
           break;
         }
         SlideMoveCol[i][j].SlideMove[1] = rowOffset + k;
+        SlideMaskCol[i][j].wNonCap |= (1 << k);
       }       
       
       for(k = k - 1; k >= 0; --k){
         if((1 << k) & j){
           SlideMoveCol[i][j].CannonCap[1] = rowOffset + k;
+          SlideMaskCol[i][j].wCannonCap |= (1 << k);
           break;
         }
       }
@@ -189,18 +272,22 @@ void genLongRangeMove(){
       SlideMoveRow[i][j].SlideMove[0] = SlideMoveRow[i][j].CannonCap[1] = 
       SlideMoveRow[i][j].RookCap[1] = SlideMoveRow[i][j].SlideMove[1] = i + colOffset;
 
+      SlideMaskRow[i][j].wNonCap = SlideMaskRow[i][j].wRookCap = SlideMaskRow[i][j].wCannonCap = 0;
       // right
       for(k = i + 1; k < 9;++k){
         if((1 << k) & j){
           SlideMoveRow[i][j].RookCap[0] = colOffset + k; // 实际的列坐标
+          SlideMaskRow[i][j].wRookCap |= (1 << k);
           break; 
         }
         SlideMoveRow[i][j].SlideMove[0] = colOffset + k;
+        SlideMaskRow[i][j].wNonCap |= (1 << k);
       }       
       
       for(k = k + 1; k < 9; ++k){
         if((1 << k) & j){
           SlideMoveRow[i][j].CannonCap[0] = colOffset + k;
+          SlideMaskRow[i][j].wCannonCap |= (1 << k);
           break; 
         }
       }
@@ -208,14 +295,17 @@ void genLongRangeMove(){
       for(k = i - 1; k >= 0;--k){
         if((1 << k) & j){
           SlideMoveRow[i][j].RookCap[1] = colOffset + k;
+          SlideMaskRow[i][j].wRookCap |= (1 << k);
           break; 
         }
         SlideMoveRow[i][j].SlideMove[1] = colOffset + k;
+        SlideMaskRow[i][j].wNonCap |= (1 << k);
       }       
      
       for(k = k - 1; k >= 0; --k){
         if((1 << k) & j){
           SlideMoveRow[i][j].CannonCap[1] = colOffset + k;
+          SlideMaskRow[i][j].wCannonCap |= (1 << k);
           break; 
         }
       }

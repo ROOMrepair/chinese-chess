@@ -25,9 +25,8 @@ struct Button
 	float paddingTB = 20.0f;
 	float w, h;
 
-	Button(const Vector2 &pos, const std::string &txt = "") : msg(txt), position(pos)
+	Button(const Vector2 &pos, const std::string &txt = "") : position(pos),msg(txt)
 	{
-
 		auto &asset = Asset::getInstance();
 		auto &font = asset.fonts[0].font;
 		const char *text = msg.c_str();
@@ -111,7 +110,7 @@ public:
 
 	void Draw()
 	{
-		for (int i = 0; i < buttonList.size(); ++i)
+		for (size_t i = 0; i < buttonList.size(); ++i)
 		{
 			const auto &button = buttonList[i];
 			button.Draw();

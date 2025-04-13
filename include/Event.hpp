@@ -24,7 +24,6 @@ enum MouseEventType
 
 const double checkDragDeltaTime = 0.10;
 
-// void mouseEvent();
 class MouseClickState
 {
 public:
@@ -36,8 +35,6 @@ public:
 	double lastClickTime;
 
 	MouseStateType state;
-
-	Vector2 lastClickPos;
 
 	Vector2 dragStartPos;
 	Vector2 dragMousePos;

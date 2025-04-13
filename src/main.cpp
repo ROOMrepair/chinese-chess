@@ -26,14 +26,10 @@ const char *conf_file = "./resources/source.conf";
 
 int main()
 {
-
-	DEBUG_("Hello Raylib",1,3.13,"\n");
-
 	SetConsoleOutputCP(CP_UTF8);
 
 	// signal handler
 	
-	// Tell the window to use vsync and work on high DPI displays
 	SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_HIGHDPI);
 
 	SetTargetFPS(60);
@@ -50,43 +46,57 @@ int main()
 	genShortRangeMove();
 	genLongRangeMove();
 	
-	bool isRedSide = false;
+	// use state manager
+	StateManager sm;	
+	bool isRedSide = true;
 
-	MouseClickState mcs;
-	GameState gst(mcs,isRedSide);
-
-	if (!gst.board.loadFromFen(cszStartFen))
+	auto gst = StateManager::makeState<GameState>(sm,isRedSide);
+	if(!gst)
 	{
-		std::cout << "Failed to load from fen" << std::endl;
+		std::cerr << "Failed to create GameState" << std::endl;
 		return 1;
 	}
 
-	// DEBUG_("is exchangeside %d\n",gst.board.isExchangeSide);
-	// DEBUG_("is redside %d\n",gst.board.isRedSide);
-
-	// gst.board.printPieces();
-	// DEBUG_("-----\n");
-	// gst.board.printBoard();
+	// start
+	sm.stateStack.push(std::move(gst));
+	
+	#ifdef MYDEBUG
+		bool redside = true;	
+		int sd = 0; // redside
+		std::cout << "redside: " << redside << " sd " << sd << std::endl;
+		for(int sq = 125; sq <= 130;sq ++){
+			std::cout << SQUARE_FORWARD(redside,sq,sd) << std::endl; 	
+		}
+		sd = 1;
+		std::cout << "redside: " << redside << " sd " << sd << std::endl;
+		for(int sq = 125; sq <= 130;sq ++){
+			std::cout << SQUARE_FORWARD(redside,sq,sd) << std::endl; 	
+		}
+		redside = false,sd = 0;
+		std::cout << "redside: " << redside << " sd " << sd << std::endl;
+		for(int sq = 125; sq <= 130;sq ++){
+			std::cout << SQUARE_FORWARD(redside,sq,sd) << std::endl; 	
+		}
+		sd = 1;
+		std::cout << "redside: " << redside << " sd " << sd << std::endl;
+		for(int sq = 125; sq <= 130;sq ++){
+			std::cout << SQUARE_FORWARD(redside,sq,sd) << std::endl; 	
+		}
+	#endif
 
 	while (!WindowShouldClose())
 	{
 		float frameTime = GetFrameTime();
 		Vector2 pos = GetMousePosition();
 		
-		// if(IsKeyPressed('N')){
-		// 	NotifyManager::getInstance().Add(
-		// 		{
-		// 			u8"此处是一个非法目标",
-		// 		});
-		// }
-
-		gst.update(pos);
+		sm.Update(frameTime,pos);
+		
 		ButtonManager::getInstance().Update(pos);
 		NotifyManager::getInstance().Update(frameTime);
 
 		BeginDrawing();
+		sm.Render(frameTime);
 
-		gst.renderScene();
 		ButtonManager::getInstance().Draw();
 		NotifyManager::getInstance().Draw();
 

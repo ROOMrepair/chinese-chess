@@ -2,6 +2,12 @@
 
 #include "raylib.h"
 
+// check move type
+#define SUCCESS 0
+#define CHECKMATED 1
+
+const int MAX_GEN_MOVES = 128;  // 搜索的最大着法数，中国象棋的任何局面都不会超过120个着法
+								
 // font 
 const int DEFAULT_FONT_SIZE = 32;
 
@@ -10,7 +16,6 @@ const int SCREEN_WIDTH = 800;
 const int SCREEN_HEIGHT = 600;
 
 // notify
-
 
 // board render
 const int BOARD_PADDING_X = 40;
@@ -58,9 +63,11 @@ const char *const cszPieceBytes = "KABNRCP";
 
 const int rowOffset = 3;
 const int colOffset = 3;
-const int rowOffsetTo = rowOffset + B_HEIGHT;
-const int colOffsetTo = colOffset + B_WIDTH;
 
+const int colCenter = 7;
+
+const int rowOffsetTo = 12;
+const int colOffsetTo = 11;
 
 inline Color PIECE_COLOR(int pt){
 	return (pt & (1 << 5)) ? BLACK : RED;
