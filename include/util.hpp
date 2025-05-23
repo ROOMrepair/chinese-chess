@@ -10,7 +10,6 @@
 	#define DEBUG_(...) DebugPrint(__VA_ARGS__)
 #endif
 
-
 inline void ltrim(std::string &s)
 {
 	s.erase(s.begin(),std::find_if(s.begin(),s.end(),[](unsigned char ch){
@@ -47,3 +46,6 @@ inline void DebugPrint(const Args& ...args){
 	debugPrint(args...);
 	std::cout << "\033[0m" << std::endl;
 }
+
+extern std::ofstream logout;
+extern std::ofstream zobristout;

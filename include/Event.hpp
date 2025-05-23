@@ -1,10 +1,11 @@
 #pragma once
 
+#include <mutex>
+
 #include "raylib.h"
 #include "util.hpp"
 #include "functional"
 
-// 这个state 应该反应的是 board 的状态
 enum MouseStateType
 {
 	Idle,
@@ -36,8 +37,8 @@ public:
 
 	MouseStateType state;
 
-	Vector2 dragStartPos;
-	Vector2 dragMousePos;
+	Vector2 dragStartPos; // 触发点击状态的时候鼠标位置
+	Vector2 dragMousePos; // 实际的鼠标位置
 
 	OnClick onClick;
 	OnDrag onDrag;
@@ -79,4 +80,70 @@ public:
 			break;
 		}
 	}
+};
+
+class Timer{
+public:
+	Timer(){}
+	~Timer(){}
+	size_t _size = 10;
+
+	std::chrono::time_point<std::chrono::high_resolution_clock> M_start_point_;
+	std::vector<std::pair<uint64_t,uint64_t>> recorder;
+
+	std::mutex mtx;
+	std::chrono::time_point<std::chrono::high_resolution_clock> record_start_;
+	
+	void start(){
+		M_start_point_ = std::chrono::high_resolution_clock::now();
+	}
+
+	uint64_t get_elapsed_ms () const
+	{
+		auto now = std::chrono::high_resolution_clock::now();
+		return std::chrono::duration_cast<std::chrono::milliseconds>(now - M_start_point_).count();
+	}
+	
+	std::string get_formatted_runtime() {
+		auto ms = get_elapsed_ms();
+		int seconds = (ms / 1000) % 60;
+		int minutes = (ms / 1000) / 60;
+		char buffer[16];
+		snprintf(buffer, sizeof(buffer), "%02d:%02d", minutes, seconds);
+		return std::string(buffer);
+	}
+
+	void start_record() {
+		record_start_ = std::chrono::high_resolution_clock::now();
+	}
+
+	void end_record() {
+		auto end = std::chrono::high_resolution_clock::now();
+		uint64_t start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(record_start_ - M_start_point_).count();
+		uint64_t end_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - M_start_point_).count();
+
+		std::lock_guard<std::mutex> lock(mtx);
+		recorder.push_back({start_ms, end_ms});
+		if (recorder.size() > _size) recorder.erase(recorder.begin()); // 保留最近 5 次
+	}
+	
+	uint64_t record() {
+		auto end = std::chrono::high_resolution_clock::now();
+		uint64_t start_ms = std::chrono::duration_cast<std::chrono::milliseconds>(record_start_ - M_start_point_).count();
+		uint64_t end_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - M_start_point_).count();
+
+		return end_ms - start_ms;
+	}
+
+
+	std::vector<std::string> get_recent_think_times() {
+		std::vector<std::string> results;
+
+		std::lock_guard<std::mutex> lck (mtx);
+		for (const auto& [start, end] : recorder) {
+			results.push_back("+ " + std::to_string(end - start) + " ms");
+		}
+		return results;
+	}
+
 };

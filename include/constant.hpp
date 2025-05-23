@@ -5,8 +5,8 @@
 // check move type
 #define SUCCESS 0
 #define CHECKMATED 1
+#define NOKING 100
 
-const int MAX_GEN_MOVES = 128;  // 搜索的最大着法数，中国象棋的任何局面都不会超过120个着法
 								
 // font 
 const int DEFAULT_FONT_SIZE = 32;
@@ -55,9 +55,32 @@ const int CANNON_TO = 10;
 const int PAWN_FROM = 11;
 const int PAWN_TO = 15;
 
+const int KING_BITPIECE = 1 << KING; // 1
+const int ADVISOR_BITPIECE = (1 << ADVISOR_FROM) | (1 << ADVISOR_TO); // 110
+const int BISHOP_BITPIECE = (1 << BISHOP_FROM) | (1 << BISHOP_TO); // 11000
+const int KNIGHT_BITPIECE = (1 << KNIGHT_FROM) | (1 << KNIGHT_TO);
+const int ROOK_BITPIECE = (1 << ROOK_FROM) | (1 << ROOK_TO);
+const int CANNON_BITPIECE = (1 << CANNON_FROM) | (1 << CANNON_TO);
+const int PAWN_BITPIECE = (1 << PAWN_FROM) | (1 << (PAWN_FROM + 1)) |
+	(1 << (PAWN_FROM + 2)) | (1 << (PAWN_FROM + 3)) | (1 << PAWN_TO);
+const int ATTACK_BITPIECE = KNIGHT_BITPIECE | ROOK_BITPIECE | CANNON_BITPIECE | PAWN_BITPIECE;
+const int PieceToList[7] = {KING,ADVISOR_TO,BISHOP_TO,KNIGHT_TO,ROOK_TO,CANNON_TO,PAWN_TO};
+
+const int cnPieceTypes[48] = {
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 6, 6, 6,
+  0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 6, 6, 6
+};
+
+// 棋子的简单分值，只在简单比较时作参考
+const int cnSimpleValues[48] = {
+  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+  5, 1, 1, 1, 1, 3, 3, 4, 4, 3, 3, 2, 2, 2, 2, 2,
+  5, 1, 1, 1, 1, 3, 3, 4, 4, 3, 3, 2, 2, 2, 2, 2,
+};
+
 // 大写为 red 
-// init: "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r";
-const char *const cszStartFen = "1nbakab1r/9/1c5c1/p1p3p1p/9/4p1n2/P1P1P1P1P/1Cr4C1/7N1/RNBAKAB1R r";
+const char *const cszStartFen = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR r";
 
 const char *const cszPieceBytes = "KABNRCP";
 
@@ -68,7 +91,3 @@ const int colCenter = 7;
 
 const int rowOffsetTo = 12;
 const int colOffsetTo = 11;
-
-inline Color PIECE_COLOR(int pt){
-	return (pt & (1 << 5)) ? BLACK : RED;
-}

@@ -71,6 +71,17 @@
 		"cstring": "cpp",
 		"*.m": "cpp",
 		"bitset": "cpp",
-		"sstream": "cpp"
+		"sstream": "cpp",
+		"thread": "cpp",
+		"future": "cpp",
+		"condition_variable": "cpp",
+		"stop_token": "cpp",
+		"ratio": "cpp",
+		"mutex": "cpp",
+		"semaphore": "cpp",
+		"chrono": "cpp",
+		"iomanip": "cpp",
+		"stdio.h": "c",
+		"errno.h": "c"
 	}
 }

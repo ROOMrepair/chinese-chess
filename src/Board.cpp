@@ -1,17 +1,34 @@
 #include "Board.hpp"
 
-Board::Board(MouseClickState &ms, bool isredside) : mcs(ms)
-{
+char szFenState[256] = {};
+
+Board::Board(MouseClickState &ms,Timer &t, bool isredside,bool useai,int depth,bool isInnerBoard) :
+	mcs(ms),tr(t),isRedSide(isredside),useAi(useai),ndepth(depth){
 	this->isRedTurn = true;
-	this->isRedSide = isredside;
-	this->isExchangeSide = false;
 
-	this->evBlack = 0;
-	this->evRed = 0;
-
-	this->clearBoard();
-	this->caculateBoardInfo();
 	this->activatedPos = {-1, -1};
+	this->BitPiece = 0;
+	this->isExchangeSide = false;
+	this->isThinking.store(false);
+
+	if(!isInnerBoard){
+		this->clearBoard();
+	}
+	this->caculateBoardInfo();
+}
+
+Board::Board(MouseClickState &ms,Timer &t,bool isInnerBoard):
+ 	mcs(ms),tr(t){
+
+	this->activatedPos = {-1, -1};
+	this->BitPiece = 0;
+	this->isExchangeSide = false;
+	this->isThinking.store(false);
+
+	if(!isInnerBoard){
+		this->clearBoard();
+	}
+	this->caculateBoardInfo();
 }
 
 Board::~Board()
@@ -92,10 +109,50 @@ int Board::PieceTextureMap(int piece)
 	}
 }
 
+void Board::boardToFen(char *szFen){
+  	char *lpFen = szFen;
+	for(int y = rowOffset;y <= rowOffsetTo;y++){
+		int k = 0;
+		for(int x = colOffset;x <= colOffsetTo;x++){
+			int pt = Squares[SQPOS_xy(x,y)]; 
+			if(pt != 0){
+				if(k > 0){
+					// 记录之前空格	
+					*lpFen = k + '0';
+					lpFen ++;
+					k = 0;
+				}
+				*lpFen = PIECE_BYTE(PIECE_TYPE(pt)) + (pt < 32 ? 0 : 'a' - 'A');
+				lpFen++;
+			}else{
+				k++;	
+			}			
+		}
+		if(k > 0){
+      		*lpFen = k + '0';
+      		lpFen ++;
+		}
+    	*lpFen = '/';
+    	lpFen ++;
+	}						
+  	*(lpFen - 1) = ' '; // 把最后一个'/'替换成' '
+
+  	*lpFen = (this->isRedTurn ? 'r' : 'b');
+  	lpFen ++;
+  	*lpFen = '\0';
+}
+
 bool Board::loadFromFen(const char *szFen)
 {
 	const char *p = szFen;
 	const char *tmp = p;
+
+	const char *temp = szFen;
+	while(*temp != '\0'){
+		std::cout << *temp;
+		temp++;		
+	}
+	std::cout << std::endl;
 
 	int pieceBlack[7];
 	int pieceRed[7];
@@ -126,25 +183,21 @@ bool Board::loadFromFen(const char *szFen)
 	{
 		if (*tmp == 'k')
 		{
-			if (isRedSide)
-			{
-				isExchangeSide = false;
-			}
-			else
-			{
-				isExchangeSide = true;
+			if(!ISMENUMODE){
+				if (isRedSide)
+					isExchangeSide = false;
+				else
+					isExchangeSide = true;
 			}
 			break;
 		}
 		else if (*tmp == 'K')
 		{
-			if (isRedSide)
-			{
-				isExchangeSide = true;
-			}
-			else
-			{
-				isExchangeSide = false;
+			if(!ISMENUMODE){
+				if (isRedSide)
+					isExchangeSide = true;
+				else
+					isExchangeSide = false;
 			}
 			break;
 		}
@@ -153,7 +206,6 @@ bool Board::loadFromFen(const char *szFen)
 
 	while (*p != ' ')
 	{
-
 		if (*p == '/')
 		{
 			row++;
@@ -179,9 +231,6 @@ bool Board::loadFromFen(const char *szFen)
 			int pt = PieceStrMap(*p);
 			if (pt < 0)
 				return false;
-			/*  这里因为固定了每个棋子的下标 pawn from~to 导致不能
-			 *  在 fen 串中添加任意棋子
-			 */
 			if (Pieces[pieceRed[pt]].alive == 1)
 			{
 				DEBUG_("piece red alive error\n");
@@ -220,13 +269,53 @@ bool Board::loadFromFen(const char *szFen)
 		p++;
 	}
 
+	while(*p != '\0'){
+		if(*p == 'r'){
+			this->isRedTurn = true;
+		}else if(*p == 'b'){
+			this->isRedTurn = false;
+		}
+		p++;
+	}
+	// add to discarded piece
+	// ! 这些弃子没有重新加到 Square和 Pieces 中，需要手动添加
+	for(int i = 0; i < 7;++i){
+		int redptFrom = pieceRed[i];
+		int redptTo = SIDE_TAG(0) + PieceToList[i];
+		while(redptFrom <= redptTo){
+			// DEBUG_("red dicarded: ",redptFrom);
+			disCardedPieces.push_back(redptFrom);
+			Pieces[redptFrom].alive = 0;
+			Pieces[redptFrom].textureIndex = PieceTextureMap(redptFrom);
+			redptFrom++;
+		}
+	}	
+		
+	for(int i = 0; i < 7; ++i){
+		int blackptFrom = pieceBlack[i];
+		int blackptTo = SIDE_TAG(1) + PieceToList[i];
+		while(blackptFrom <= blackptTo){
+			// DEBUG_("black dicarded: ",blackptFrom);
+			disCardedPieces.push_back(blackptFrom);
+			Pieces[blackptFrom].alive = 0;
+			Pieces[blackptFrom].textureIndex = PieceTextureMap(blackptFrom);
+			blackptFrom++;
+		}
+	}	
+
+
+	for(auto i:disCardedPieces){
+		std::cout << "discarded: " << i << std::endl;
+	}
 	return true;
 }
 
 bool Board::addPiece(int row, int col, int piece)
 {
+	int pt;
 	// todo 这里暂时在 addpiece 中同步修改 wbitmask
 	// todo 在每一步对棋盘的更改处,都需要对 wbitmask 更改
+	// 这个决定了最终的棋子分布
 	if (isExchangeSide)
 	{
 		row = 9 - row;
@@ -240,24 +329,40 @@ bool Board::addPiece(int row, int col, int piece)
 	wBitRows[RANK_Y(sq)] ^= RowMask(sq);
 
 	Pieces[piece].alive = sq;
+	BitPiece ^= BIT_PIECE(piece);
+
 	int textureIndex = PieceTextureMap(piece);
 	if (textureIndex < 0)
 	{
 		return false;
 	}
 	Pieces[piece].textureIndex = textureIndex;
+
+	// 叠加所有棋子的信息
+	pt = PIECE_TYPE(piece);
+	if(piece >= 32){
+		pt += 7;	
+	}
+  	this->zobr.Xor(zobrTable[pt][sq]);
 	return true;
 }
 
 void Board::clearBoard()
 {
+    zobr.InitZero();
+	ClearRollbackList();
+	this->lastmoveCur = 0;
+	ClearHash();
+	evRed = evBlack = 0;
+	BitPiece = 0;
 	std::memset(Squares, 0, 256);
 	std::memset(Pieces, 0, sizeof(PieceType) * 48);
 	std::memset(wBitCols, 0, sizeof(uint16_t) * 16);
 	std::memset(wBitRows, 0, sizeof(uint16_t) * 16);
+	this->disCardedPieces.clear();
 }
 
-bool Board::caculateBoardInfo()
+void Board::caculateBoardInfo()
 {
 	auto &asset = Asset::getInstance();
 	auto &bt = asset.pieceTextures[BOARD_INDEX].texture;
@@ -289,8 +394,6 @@ bool Board::caculateBoardInfo()
 	this->binfo.pieceScale = 0.75f;
 	this->binfo.BoardOriginX = BOARD_PADDING_X;
 	this->binfo.BoardOriginY = BOARD_PADDING_Y;
-
-	return true;
 }
 
 Vector2 Board::screenXY(int x, int y)
@@ -357,9 +460,6 @@ void Board::drawPieces(bool isDragging)
 					circleXY.x += this->mcs.dragMousePos.x - this->mcs.dragStartPos.x;
 					circleXY.y += this->mcs.dragMousePos.y - this->mcs.dragStartPos.y;
 
-					// circleXY.x += dragMousePos.x - dragStartPos.x;
-					// circleXY.y += dragMousePos.y - dragStartPos.y;
-
 					activeCircleX = circleXY.x;
 					activeCircleY = circleXY.y;
 
@@ -385,7 +485,7 @@ void Board::drawPieces(bool isDragging)
 				Vector2 textXY = {circleXY.x - cx, circleXY.y - cy};
 
 				// 右上角画标记
-				// 
+				//
 				DrawCircleV(
 					circleXY,
 					this->binfo.radius,
@@ -397,16 +497,24 @@ void Board::drawPieces(bool isDragging)
 					this->binfo.pieceScale,
 					WHITE);
 
-				#ifdef MYDEBUG
-					DrawTextEx(asset.fonts[0].font, std::to_string(pt & 0x0f).c_str(), {textXY.x + cx * 2 - 5, textXY.y - 5}, 30, 0, GREEN);
+
+#ifdef MYDEBUG
+				if(showTags){
+					DrawTextEx(asset.fonts[0].font, std::to_string(pt).c_str(), {textXY.x + cx * 2 - 5, textXY.y - 5}, 30, 0, GREEN);
 					DrawTextEx(asset.fonts[0].font, std::to_string(sqPos).c_str(), {textXY.x + cx * 2 - 5, textXY.y - 30}, 30, 0, GREEN);
-					if(Proteced(isRedTurn ? 0 : 1,sqPos,0) && (((pt & (1 << 5)) >> 5) ^ isRedTurn)){
-						DrawRing(circleXY,
-					 		this->binfo.radius,
-					 		this->binfo.radius + 5, 0, 360, 36, BLUE);		
+
+					// draw protected
+					if(!ISMENUMODE){
+						if (Protected(isRedTurn ? 0 : 1, sqPos, 0) && (((pt & (1 << 5)) >> 5) ^ isRedTurn))
+						{
+							DrawRing(circleXY,
+							 		this->binfo.radius,
+							 		this->binfo.radius + 5, 0, 360, 36, BLUE);
+						}
+						
 					}
-					
-				#endif
+				}
+#endif
 			}
 		}
 	}
@@ -421,6 +529,138 @@ void Board::drawPieces(bool isDragging)
 
 		DrawCircleV({activeCircleX, activeCircleY}, this->binfo.radius, c);
 		DrawTextureEx(p_texture, {activeTx, activeTy}, 0, this->binfo.pieceScale, WHITE);
+	}
+}
+
+void Board::PieceFreePos(int pt,std::function<void(int,int,int)> cb){
+	bool isred = !((1 << 5) & pt);
+	__ASSERT_PIECE(pt);
+
+	auto checkSideValid = [this,isred](int ptype,int sqDst){
+		switch (ptype & 0x0f)
+		{
+		case KING:
+		case ADVISOR_FROM...ADVISOR_TO:
+		case BISHOP_FROM...BISHOP_TO:
+		case PAWN_FROM...PAWN_TO:
+			if(isred){
+				if(isRedSide){
+					//红在 board 下方,检查目标位置是否在同一边
+					return SAME_HALF(sqDst,0xc7);	
+				}else{
+					//红在 board 上方
+					return SAME_HALF(sqDst,0x37);
+				}
+			}else{
+				if(isRedSide){
+					//红在 board 下方
+					return SAME_HALF(sqDst,0x37);
+				}else{
+					//红在 board 上方
+					return SAME_HALF(sqDst,0xc7);	
+				}
+			}	
+		default:
+			return true;
+		}	
+	};
+
+	switch (cnPieceTypes[pt])
+	{
+	case KING:
+		for(int i = 0; i < B_HEIGHT;++i){
+			for(int j = 0; j < B_WIDTH; ++j){
+				int sqDstPos = SQpos(i,j);
+				if(IN_FORT(sqDstPos) && Squares[sqDstPos] == 0 && checkSideValid(pt,sqDstPos)){
+					cb(j,i,0);
+				}
+			}	
+		}
+		break;
+	case ADVISOR_TYPE:
+		for(int i = 0; i < B_HEIGHT;++i){
+			for(int j = 0; j < B_WIDTH; ++j){
+				int sqDstPos = SQpos(i,j);
+				if(IN_FORT(sqDstPos) && Squares[sqDstPos] == 0 
+					&& checkSideValid(pt,sqDstPos) 
+					&& validPosAdvisorBishop[sqDstPos] == ADVISOR_TYPE){
+					cb(j,i,0);
+				}
+			}	
+		}
+		break;
+	case BISHOP_TYPE:
+		for(int i = 0; i < B_HEIGHT;++i){
+			for(int j = 0; j < B_WIDTH; ++j){
+				int sqDstPos = SQpos(i,j);
+				if(Squares[sqDstPos] == 0 
+					&& checkSideValid(pt,sqDstPos) 
+					&& validPosAdvisorBishop[sqDstPos] == BISHOP_TYPE){
+					cb(j,i,0);
+				}
+			}	
+		}
+		break;
+	case PAWN_TYPE:
+		for(int i = 0; i < B_HEIGHT;++i){
+			for(int j = 0; j < B_WIDTH; ++j){
+				int sqDstPos = SQpos(i,j);
+				if(Squares[sqDstPos] != 0)
+					continue;
+				// 目标位置是同一边
+				if(checkSideValid(pt,sqDstPos)){
+					if(validPosPawn[sqDstPos] != PAWN_TYPE){
+						continue;	
+					}
+						// 此时在前进一个就为对方则判断处于边线位置?
+					if(DIFF_HALF(SQUARE_FORWARD(isRedSide,sqDstPos,!isred),sqDstPos)){
+						// 边线后面一格
+						int ptback = Squares[SQUARE_BACKWARD(isRedSide,sqDstPos,!isred)];
+						if(!ptback){
+							cb(j,i,0);
+							continue;
+						}
+						bool isbackred = !((1 << 5) & ptback);
+						int backtype = cnPieceTypes[ptback];
+						// 如果是背后是空,自己,或者 非本方的兵,则是合法的
+						// 这里分为不是自己方和不是兵，因为自己方的话，第二个检测过不了
+						if((ptback == pt) || (isbackred ^ isred) || (backtype != PAWN_TYPE)){
+							cb(j,i,0);
+						}
+					}else{
+						// 此时目标为兵原点所在行,此时保证前一个不是本方兵
+						int ptforw = Squares[SQUARE_FORWARD(isRedSide,sqDstPos,!isred)];
+						if(!ptforw){
+							cb(j,i,0);
+							continue;
+						}
+						bool isforwred = !((1 << 5) & ptforw);
+						int backtype = cnPieceTypes[ptforw];
+						if((ptforw == pt) || (isforwred ^ isred) || (backtype != PAWN_TYPE)){
+							cb(j,i,0);
+						}
+					}
+				}else{
+					// 对边不需检查位置
+					cb(j,i,0);
+				}
+			}	
+		}
+		break;
+	case KNIGHT_TYPE:
+	case ROOK_TYPE:
+	case CANNON_TYPE:
+		for(int i = 0; i < B_HEIGHT;++i){
+			for(int j = 0; j < B_WIDTH; ++j){
+				int sqDstPos = SQpos(i,j);
+				if(Squares[sqDstPos] == 0){
+					cb(j,i,0);
+				}
+			}	
+		}
+		break;
+	default:
+		break;
 	}
 }
 
@@ -441,30 +681,70 @@ void Board::drawMarker(bool isDragging)
 					 this->binfo.radius + 5, 0, 360, 36, ringColor);
 		}
 
-		// 画目标点
-		pieceCap(pt, pos, [this](int bx, int by)
-				 {
-			int sqSrc = SQpos(activatedPos.y,activatedPos.x);
-			int sqDst = SQpos(by, bx);					
-
-			int sqSrcPiece = Squares[sqSrc];
-			int sqDstPiece = Squares[sqDst];
-
-			if(sqDstPiece == 0){
+		if(ISMENUMODE){
+			this->PieceFreePos(pt,[this](int bx,int by,[[maybe_unused]]int debug){
 				DrawCircleV(screenXY(bx,by), 5, PURPLE);			
-			}else if((sqDstPiece & ( 1 << 5)) != (sqSrcPiece & (1 << 5))){
-				// DrawCircleV(screenXY(bx,by), 5, GREEN);			
-				DrawRing(screenXY(bx,by),
-					 this->binfo.radius,
-					 this->binfo.radius + 5, 0, 360, 36, GREEN);
-			} });
+			});		
+			return;
+		}
+		// 画目标点
+		pieceCap(pt, pos, [this](int bx, int by,int debug)
+			{
+				int sqSrc = SQpos(activatedPos.y,activatedPos.x);
+				int sqDst = SQpos(by, bx);					
+
+				int sqSrcPiece = Squares[sqSrc];
+				int sqDstPiece = Squares[sqDst];
+
+				if(sqDst == sqSrc){
+					return;
+				}
+
+				if(debug){
+					if(showTags){
+						DrawRing(screenXY(bx,by),
+					 		this->binfo.radius,
+					 		this->binfo.radius + 5, 0, 360, 36, GOLD);
+					}
+					return;
+				}else{
+					if(sqDstPiece == 0){
+						DrawCircleV(screenXY(bx,by), 5, PURPLE);			
+					}else if((sqDstPiece & ( 1 << 5)) != (sqSrcPiece & (1 << 5))){
+						DrawRing(screenXY(bx,by),
+					 		this->binfo.radius,
+					 		this->binfo.radius + 5, 0, 360, 36, GREEN);
+					}
+				}
+			});
+	}else if(activatedDisCardedPos >= 0){
+		int pt = disCardedPieces[static_cast<size_t>(activatedDisCardedPos)];
+		if(ISMENUMODE){
+			this->PieceFreePos(pt,[this](int bx,int by,[[maybe_unused]]int debug){
+				DrawCircleV(screenXY(bx,by), 5, PURPLE);			
+			});
+			return;
+		}
+	}
+
+	// 绘制 lastmove
+	if(!ISMENUMODE && !moveAnim.isAnimating){
+		if(lastmoveCur > 0 && IN_BOARD(rbsList[lastmoveCur - 1].mvs.Src) && IN_BOARD(rbsList[lastmoveCur - 1].mvs.Dst)){
+			Color rc = Squares[rbsList[lastmoveCur - 1].mvs.Src] & (1 << 5) ? RING_COLOR_Orange : RING_COLOR_Purple;
+			DrawRing(screenXY(BOARD_X(rbsList[lastmoveCur - 1].mvs.Dst),BOARD_Y(rbsList[lastmoveCur - 1].mvs.Dst)),
+						this->binfo.radius,
+						this->binfo.radius + 5, 0, 360, 36, rc);
+
+			DrawCircleV(screenXY(BOARD_X(rbsList[lastmoveCur - 1].mvs.Src),BOARD_Y(rbsList[lastmoveCur - 1].mvs.Src)), 5, rc);
+		}
 	}
 }
 
-void Board::pieceCap(int pt, int pos, std::function<void(int, int)> cb)
+void Board::pieceCap(int pt, int pos, std::function<void(int, int,[[maybe_unused]] int)> cb) const
 {
-	int i, bx, by, col_mask, row_mask, p, j;
-	SlideMoveStruct col_move, row_move;
+	int i, bx, by, p, j;
+	// SlideMoveStruct col_move, row_move;
+	SlideMoveStruct *Colmove,* Rowmove;
 
 	switch (pt & 0x0f)
 	{
@@ -473,7 +753,7 @@ void Board::pieceCap(int pt, int pos, std::function<void(int, int)> cb)
 		while (KingMoves[pos][i] != 0)
 		{
 			int x = BOARD_X(KingMoves[pos][i]), y = BOARD_Y(KingMoves[pos][i]);
-			cb(x, y);
+			cb(x, y, 0);
 			i++;
 		}
 		break;
@@ -482,7 +762,7 @@ void Board::pieceCap(int pt, int pos, std::function<void(int, int)> cb)
 		while (AdvisorMoves[pos][i] != 0)
 		{
 			int x = BOARD_X(AdvisorMoves[pos][i]), y = BOARD_Y(AdvisorMoves[pos][i]);
-			cb(x, y);
+			cb(x, y,0);
 			i++;
 		}
 		break;
@@ -493,7 +773,7 @@ void Board::pieceCap(int pt, int pos, std::function<void(int, int)> cb)
 			if (Squares[BishopPins[pos][i]] == 0)
 			{
 				int x = BOARD_X(BishopMoves[pos][i]), y = BOARD_Y(BishopMoves[pos][i]);
-				cb(x, y);
+				cb(x, y,0);
 			}
 			i++;
 		}
@@ -505,7 +785,7 @@ void Board::pieceCap(int pt, int pos, std::function<void(int, int)> cb)
 			if (Squares[KnightPins[pos][i]] == 0)
 			{
 				int x = BOARD_X(KnightMoves[pos][i]), y = BOARD_Y(KnightMoves[pos][i]);
-				cb(x, y);
+				cb(x, y,0);
 			}
 			i++;
 		}
@@ -524,102 +804,123 @@ void Board::pieceCap(int pt, int pos, std::function<void(int, int)> cb)
 		// SlideMoveCol[by][j] 棋子在列中的位置用 行坐标 by
 		bx = FILE_X(pos) - colOffset;
 		by = RANK_Y(pos) - rowOffset;
-		col_mask = wBitCols[FILE_X(pos)];
-		row_mask = wBitRows[RANK_Y(pos)];
-		col_move = SlideMoveCol[by][col_mask];
-		row_move = SlideMoveRow[bx][row_mask];
+		// col_mask = wBitCols[FILE_X(pos)];
+		// row_mask = wBitRows[RANK_Y(pos)];
+		// col_move = SlideMoveCol[by][col_mask];
+		// row_move = SlideMoveRow[bx][row_mask];
 
+		Colmove = FileMovePtr(FILE_X(pos),RANK_Y(pos));
+		Rowmove = RankMovePtr(FILE_X(pos),RANK_Y(pos));
 		// col move
-		for (p = col_move.SlideMove[1] - rowOffset; p <= by - 1; ++p)
+		for (p = Colmove->SlideMove[1] - rowOffset; p <= by - 1; ++p)
 		{
-			cb(bx, p);
+			cb(bx, p, 0);
 		}
 
-		for (p = by + 1; p <= col_move.SlideMove[0] - rowOffset; ++p)
+		for (p = by + 1; p <= Colmove->SlideMove[0] - rowOffset; ++p)
 		{
-			cb(bx, p);
+			cb(bx, p, 0);
 		}
 
 		// row move
-		for (p = row_move.SlideMove[1] - colOffset; p <= bx - 1; ++p)
+		for (p = Rowmove->SlideMove[1] - colOffset; p <= bx - 1; ++p)
 		{
-			cb(p, by);
+			cb(p, by, 0);
 		}
 
-		for (p = bx + 1; p <= row_move.SlideMove[0] - colOffset; ++p)
+		for (p = bx + 1; p <= Rowmove->SlideMove[0] - colOffset; ++p)
 		{
-			cb(p, by);
+			cb(p, by, 0);
 		}
 
 		// cap col
 		for (j = 0; j < 2; ++j)
 		{
-			p = col_move.RookCap[j] - rowOffset;
+			p = Colmove->RookCap[j] - rowOffset;
 			if (p >= 0)
 			{
-				cb(bx, p);
+				cb(bx, p, 0);
 			}
 		}
 
 		// cap row
 		for (j = 0; j < 2; ++j)
 		{
-			p = row_move.RookCap[j] - colOffset;
+			p = Rowmove->RookCap[j] - colOffset;
 			if (p >= 0)
 			{
-				cb(p, by);
+				cb(p, by,0);
 			}
 		}
-
 		break;
 	case CANNON_FROM ... CANNON_TO:
+
 		bx = FILE_X(pos) - colOffset;
 		by = RANK_Y(pos) - rowOffset;
-		col_mask = wBitCols[FILE_X(pos)];
-		row_mask = wBitRows[RANK_Y(pos)];
-		col_move = SlideMoveCol[by][col_mask];
-		row_move = SlideMoveRow[bx][row_mask];
+		// col_mask = wBitCols[FILE_X(pos)];
+		// row_mask = wBitRows[RANK_Y(pos)];
+		// col_move = SlideMoveCol[by][col_mask];
+		// row_move = SlideMoveRow[bx][row_mask];
+
+		Colmove = FileMovePtr(FILE_X(pos),RANK_Y(pos));
+		Rowmove = RankMovePtr(FILE_X(pos),RANK_Y(pos));
 		// col move
-		for (p = col_move.SlideMove[1] - rowOffset; p <= by - 1; ++p)
+		for (p = Colmove->SlideMove[1] - rowOffset; p <= by - 1; ++p)
 		{
-			cb(bx, p);
+			cb(bx, p,0);
 		}
 
-		for (p = by + 1; p <= col_move.SlideMove[0] - rowOffset; ++p)
+		for (p = by + 1; p <= Colmove->SlideMove[0] - rowOffset; ++p)
 		{
-			cb(bx, p);
+			cb(bx, p,0);
 		}
 
 		// row move
-		for (p = row_move.SlideMove[1] - colOffset; p <= bx - 1; ++p)
+		for (p = Rowmove->SlideMove[1] - colOffset; p <= bx - 1; ++p)
 		{
-			cb(p, by);
+			cb(p, by,0);
 		}
 
-		for (p = bx + 1; p <= row_move.SlideMove[0] - colOffset; ++p)
+		for (p = bx + 1; p <= Rowmove->SlideMove[0] - colOffset; ++p)
 		{
-			cb(p, by);
+			cb(p, by,0);
 		}
 
 		// cap col
 		for (j = 0; j < 2; ++j)
 		{
-			p = col_move.CannonCap[j] - rowOffset;
+			p = Colmove->CannonCap[j] - rowOffset;
 			if (p >= 0)
 			{
-				cb(bx, p);
+				cb(bx, p,0);
 			}
 		}
 
 		// cap row
 		for (j = 0; j < 2; ++j)
 		{
-			p = row_move.CannonCap[j] - colOffset;
+			p = Rowmove->CannonCap[j] - colOffset;
 			if (p >= 0)
 			{
-				cb(p, by);
+				cb(p, by,0);
 			}
 		}
+
+	#ifdef SUPERCAP // for super cap
+		for( j = 0;j < 2; ++j){
+			p = Colmove->SuperCap[j] - rowOffset;
+			if (p >= 0){
+				cb(bx, p, 1);
+			}
+		}
+
+		for( j = 0;j < 2; ++j){
+			p = Rowmove->SuperCap[j] - colOffset;
+			if (p >= 0){
+				cb(p, by, 1);
+			}
+		}
+	#endif
 
 		break;
 	case PAWN_FROM ... PAWN_TO:
@@ -633,7 +934,7 @@ void Board::pieceCap(int pt, int pos, std::function<void(int, int)> cb)
 				while (PawnMoves[1][pos][i] != 0)
 				{
 					int x = BOARD_X(PawnMoves[1][pos][i]), y = BOARD_Y(PawnMoves[1][pos][i]);
-					cb(x, y);
+					cb(x, y,0);
 					i++;
 				}
 			}
@@ -642,7 +943,7 @@ void Board::pieceCap(int pt, int pos, std::function<void(int, int)> cb)
 				while (PawnMoves[0][pos][i] != 0)
 				{
 					int x = BOARD_X(PawnMoves[0][pos][i]), y = BOARD_Y(PawnMoves[0][pos][i]);
-					cb(x, y);
+					cb(x, y,0);
 					i++;
 				}
 			}
@@ -655,7 +956,7 @@ void Board::pieceCap(int pt, int pos, std::function<void(int, int)> cb)
 				while (PawnMoves[0][pos][i] != 0)
 				{
 					int x = BOARD_X(PawnMoves[0][pos][i]), y = BOARD_Y(PawnMoves[0][pos][i]);
-					cb(x, y);
+					cb(x, y,0);
 					i++;
 				}
 			}
@@ -664,7 +965,7 @@ void Board::pieceCap(int pt, int pos, std::function<void(int, int)> cb)
 				while (PawnMoves[1][pos][i] != 0)
 				{
 					int x = BOARD_X(PawnMoves[1][pos][i]), y = BOARD_Y(PawnMoves[1][pos][i]);
-					cb(x, y);
+					cb(x, y,0);
 					i++;
 				}
 			}
@@ -676,42 +977,8 @@ void Board::pieceCap(int pt, int pos, std::function<void(int, int)> cb)
 	}
 }
 
-void Board::printPieces()
-{
-	for (int i = 0; i < 48; ++i)
-	{
-		DEBUG_(Pieces[i].textureIndex);
-	}
-	DEBUG_("\n");
-}
-
-void Board::printSquares()
-{
-	for (int i = 0; i < 16; ++i)
-	{
-		for (int j = 0; j < 16; ++j)
-		{
-			DEBUG_("%d ", Squares[16 * i + j]);
-		}
-		DEBUG_("\n");
-	}
-}
-
-void Board::printBoard()
-{
-	for (int i = rowOffset; i <= rowOffsetTo; ++i)
-	{
-		for (int j = colOffset; j <= colOffsetTo; ++j)
-		{
-			DEBUG_("%d ", Squares[16 * i + j]);
-		}
-		DEBUG_("\n");
-	}
-}
-
 bool Board::checkClickActivation(Vector2 pos, BoardPos &bp)
 {
-
 	for (int i = 0; i < B_HEIGHT; ++i)
 	{
 		for (int j = 0; j < B_WIDTH; ++j)
@@ -723,7 +990,20 @@ bool Board::checkClickActivation(Vector2 pos, BoardPos &bp)
 				float cy = this->binfo.BoardOriginY + i * this->binfo.gridHeight;
 				if (CheckCollisionPointCircle(pos, {cx, cy}, this->binfo.radius))
 				{
-					//! silly
+					if(ISMENUMODE){
+						bp.x = j;
+						bp.y = i;
+						return true;	
+					}
+					if(useAi){
+						// 不是本方直接不允许点击
+						if((isRedSide && (piece_i & (1 << 5))) || (!isRedSide && !(piece_i & (1 << 5)))){
+							if(activatedPos.x < 0 || activatedPos.y < 0){
+								NotifyManager::getInstance().Add({"不能操控对方棋子"});
+							}
+							return false;
+						}
+					}
 					if (((piece_i & (1 << 5)) && isRedTurn) || (!(piece_i & (1 << 5)) && !isRedTurn))
 					{
 						if (activatedPos.x < 0 || activatedPos.y < 0)
@@ -746,87 +1026,94 @@ bool Board::checkClickActivation(Vector2 pos, BoardPos &bp)
 
 void Board::changeSide()
 {
-	this->activatedPos.x = -1;
-	this->activatedPos.y = -1;
+	this->changeSideSimulation();
+	this->triggerSearch();
+}
+
+void Board::changeSideSimulation(){
+	this->activatedPos = {-1,-1};
 	this->mcs.state = MouseStateType::Idle;
 	this->isRedTurn = !this->isRedTurn;
+
+    this->zobr.Xor(zobrPlayer);
 }
 
-int Board::capture(int sqSrc, int sqDst)
+int Board::move(int sqSrc, int sqDst,bool isCheck)
 {
-	if (!this->checkMateMove(sqSrc, sqDst, true))
+	int tp;
+	int sqSrcpt = Squares[sqSrc];
+	int sqDstpt = Squares[sqDst]; // 如果非capture，为 0
+	if (!this->ISMENUMODE && isCheck)
 	{
-		return CHECKMATED;
-	}
-	this->activateAnimation(sqSrc, sqDst, true);
-	return SUCCESS;
-}
-
-int Board::move(int sqSrc, int sqDst)
-{
-	if (!this->checkMateMove(sqSrc, sqDst, false))
-	{
-		return CHECKMATED;
-	}
-	this->activateAnimation(sqSrc, sqDst, false);
-	return SUCCESS;
-}
-
-// move
-// 每一次移动前/后需要进行检查
-// pre:
-// 1.被将军检测，是否会造成/已造成本方被将军，会则禁止移动，并提示
-// post:
-// 1. 将死检测，对两侧的将都需要检测,检测后需要对目前所有的将军线路进行判断，是否能够通过移动阻隔脱离将军状态
-//
-// (如果没有这样的一条线路)
-//
-// checkmatemove 是对本方，为 premove check
-int Board::checkMateMove(int sqSrc, int sqDst, bool isCapture)
-{
-	int piece_i_src = Squares[sqSrc]; // 棋子类型
-	int piece_i_dst = Squares[sqDst];
-
-	// trymove
-	Pieces[piece_i_src].alive = sqDst;
-	Squares[sqDst] = Squares[sqSrc];
-	if (!isCapture)
-	{
-		wBitCols[FILE_X(sqDst)] ^= ColMask(sqDst);
-		wBitRows[RANK_Y(sqDst)] ^= RowMask(sqDst);
-	}
-	else
-	{
-		// 目标位置还是有棋子,棋盘状态不变,但是需要更改目标位置的棋子状态
-		Pieces[piece_i_dst].alive = 0;
-	}
-
-	Squares[sqSrc] = 0;
-	wBitCols[FILE_X(sqSrc)] ^= ColMask(sqSrc);
-	wBitRows[RANK_Y(sqSrc)] ^= RowMask(sqSrc);
-
-	// rollback
-	auto rollback = [&]()
-	{
-		Squares[sqSrc] = piece_i_src;
-		Squares[sqDst] = piece_i_dst;
-		Pieces[piece_i_src].alive = sqSrc;
-		Pieces[piece_i_dst].alive = sqDst;
-
-		if (!isCapture)
-		{
-			wBitCols[FILE_X(sqDst)] ^= ColMask(sqDst);
-			wBitRows[RANK_Y(sqDst)] ^= RowMask(sqDst);
+		// trymove
+		this->SaveStatus(); //? 存储 evblack/red zobr
+		this->MakeMove(sqSrc,sqDst); //? 修改了Square wbitcol/row Piece bitpiece evblack/red zobr 
+		if(tp = checkMate(),tp != 0 && tp != NOKING){
+			this->RollbackMove(sqSrc,sqDst,sqSrcpt,sqDstpt); //? 恢复Square wbitcol/row Piece bitpiece
+			this->Rollback(); //? 恢复 evblack/red zobr 
+			return CHECKMATED;
 		}
 
-		wBitCols[FILE_X(sqSrc)] ^= ColMask(sqSrc);
-		wBitRows[RANK_Y(sqSrc)] ^= RowMask(sqSrc);
-	};
+		this->RollbackMove(sqSrc,sqDst,sqSrcpt,sqDstpt); //? 恢复Square wbitcol/row Piece bitpiece
+		this->Rollback(); //? 恢复 evblack/red zobr 
+	}
+	this->activateAnimation(sqSrc, sqDst,[this](){
+		this->postMove();
+	});
+	return SUCCESS;
+}
 
+void Board::UndoLastMove(){
+
+	if(lastmoveCur < 1){
+		NotifyManager::getInstance().Add({
+			"不能回退,无记录"	
+		});
+		return;
+	}
+	// 如果是 ai，在我方回合触发: 退两步 
+	// 				开局时：我方先手，此时回退数组大小为0，不用考虑
+	//           			我方后手，此时大小为1，不能触发。
+	//			 在对方回合触发: 退一步
+	// 不是 ai, （本系统假设只能退一步，只在对手回合退）
+	
+	if(useAi){
+		if(isRedSide ^ isRedTurn){
+			// 对方思考, 回退一次
+			this->stopSearch(true);
+			assert(rbMoveNum == lastmoveCur);
+			this->UndoSimulateMove();
+			lastmoveCur--;
+
+		}else{
+			// 本方
+			if(lastmoveCur < 2){
+				NotifyManager::getInstance().Add({
+					"不能回退,无记录"	
+				});
+				return;
+			}
+
+			this->UndoSimulateMove();
+			lastmoveCur--;
+
+			this->UndoSimulateMove();
+			lastmoveCur--;
+		}
+	}else{
+		this->UndoSimulateMove();
+		lastmoveCur--;
+	}
+
+	DEBUG_("[悔棋后 Zobrist: ",zobr.dwKey, " ",zobr.dwLock0," ",zobr.dwLock1," ]");
+}
+
+int Board::checkMate() // 不要在内部移动,这个只检测当前局面
+{
 	// 对本方的将军检测
 	int kingSqPos = isRedTurn ? Pieces[SIDE_TAG(0)].alive : Pieces[SIDE_TAG(1)].alive;
 	int oppositeSide = isRedTurn ? SIDE_TAG(1) : SIDE_TAG(0);
-	int opponentKingSqPos = Pieces[oppositeSide].alive; 
+	int opponentKingSqPos = Pieces[oppositeSide].alive;
 
 	// 当前将位置
 	int kx = FILE_X(kingSqPos);
@@ -834,75 +1121,39 @@ int Board::checkMateMove(int sqSrc, int sqDst, bool isCapture)
 
 	if (kingSqPos == 0 || opponentKingSqPos == 0)
 	{
-		rollback();
-		return false;
+		return NOKING;
 	}
 
-	int i,j,p,attackPos,attackPawnSide;
+	int i, j, attackPos, attackPawnSide;
 
 	// 检测对将,使用车的列着法
-	int kbx = FILE_X(kingSqPos) - colOffset;
-	int kby = RANK_Y(kingSqPos) - rowOffset;
-	int col_mask = wBitCols[FILE_X(kingSqPos)];
-	int row_mask = wBitRows[RANK_Y(kingSqPos)];
-	SlideMoveStruct col_move, row_move;
-
-	SlideMaskStruct *mskcol = this->FileMaskPtr(kx, ky); 
+	SlideMaskStruct *mskcol = this->FileMaskPtr(kx, ky);
 	SlideMaskStruct *mskrow = this->RankMaskPtr(kx, ky);
-
-
-	col_move = SlideMoveCol[kby][col_mask];
-	row_move = SlideMoveRow[kbx][row_mask];
 
 	if (kx == FILE_X(opponentKingSqPos))
 	{
-		#ifdef MYDEBUG
-		std::cout << "kingpos " << kingSqPos << " opkingpos " << opponentKingSqPos << std::endl;
-		std::cout << "wbitcol of " << kbx << " " << kby << " : "<< std::bitset<16>(wBitCols[kx]) << std::endl;
-		std::cout << "rookcap of " << kbx << " " << kby << " : "<< std::bitset<16>(mskcol->wRookCap) << std::endl;
-		#endif
-		if((mskcol->wRookCap & (1 << (RANK_Y(opponentKingSqPos) - rowOffset))) != 0){
-				Notify n = {"CHECKMATED"};
-				n.color = RED;
-				n.fontSize = 48;
-				NotifyManager::getInstance().Add(std::move(n));
-				rollback();
-				return false;
+		if ((mskcol->wRookCap & (1 << (RANK_Y(opponentKingSqPos) - rowOffset))) != 0)
+		{
+			return oppositeSide + KING;
 		}
-		// for (j = 0; j < 2; ++j)
-		// {
-		// 	p = col_move.RookCap[j] - rowOffset;
-		// 	if (p == RANK_Y(opponentKingSqPos) - rowOffset)
-		// 	{
-		// 		Notify n = {"CHECKMATED"};
-		// 		n.color = RED;
-		// 		n.fontSize = 48;
-		// 		NotifyManager::getInstance().Add(std::move(n));
-		// 		rollback();
-		// 		return false;
-		// 	}
-		// }
 	}
 
-
 	// 检测马将
-	for(i = KNIGHT_FROM;i <= KNIGHT_TO;++i){
+	for (i = KNIGHT_FROM; i <= KNIGHT_TO; ++i)
+	{
 		attackPos = Pieces[i + oppositeSide].alive;
 
-		if(attackPos == 0) continue;	
-		j = 0;	
+		if (attackPos == 0)
+			continue;
+		j = 0;
 		while (KnightMoves[attackPos][j] != 0)
 		{
 			if (Squares[KnightPins[attackPos][j]] == 0)
 			{
 
-				if(kingSqPos == KnightMoves[attackPos][j]){
-					Notify n = {"CHECKMATED"};
-					n.color = RED;
-					n.fontSize = 48;
-					NotifyManager::getInstance().Add(std::move(n));
-					rollback();
-					return false;
+				if (kingSqPos == KnightMoves[attackPos][j])
+				{
+					return oppositeSide + i;
 				}
 			}
 			j++;
@@ -918,155 +1169,168 @@ int Board::checkMateMove(int sqSrc, int sqDst, bool isCapture)
 	// 0 0 -> 0
 	attackPawnSide = !(isRedSide ^ isRedTurn);
 
-	for(i = PAWN_FROM;i <= PAWN_TO;++i){
+	for (i = PAWN_FROM; i <= PAWN_TO; ++i)
+	{
 		attackPos = Pieces[i + oppositeSide].alive;
 
-		if(attackPos == 0) continue;	
-		j = 0;	
+		if (attackPos == 0)
+			continue;
+		j = 0;
 		while (PawnMoves[attackPawnSide][attackPos][j] != 0)
 		{
-			if(kingSqPos == PawnMoves[attackPawnSide][attackPos][j]){
-				Notify n = {"CHECKMATED"};
-				n.color = RED;
-				n.fontSize = 48;
-				NotifyManager::getInstance().Add(std::move(n));
-				rollback();
-				return false;
+			if (kingSqPos == PawnMoves[attackPawnSide][attackPos][j])
+			{
+				return oppositeSide + i;
 			}
 			j++;
 		}
 	}
 	// 检测车将
-	for(i = ROOK_FROM; i <= ROOK_TO;++i){
+	//
+	for (i = ROOK_FROM; i <= ROOK_TO; ++i)
+	{
 		attackPos = Pieces[i + oppositeSide].alive;
-		if(attackPos == 0) continue;	
-		
-		if (kx == FILE_X(attackPos)){
-			for( j = 0; j < 2;++j){
-				p = col_move.RookCap[j] - rowOffset;
-				if (p == RANK_Y(attackPos) - rowOffset)
-				{
-					Notify n = {"CHECKMATED"};
-					n.color = RED;
-					n.fontSize = 48;
-					NotifyManager::getInstance().Add(std::move(n));
-					rollback();
-					return false;
-				}		
+		if (attackPos == 0)
+			continue;
+
+		if (kx == FILE_X(attackPos))
+		{
+			if ((mskcol->wRookCap & (1 << (RANK_Y(attackPos) - rowOffset))) != 0)
+			{
+				return oppositeSide + i;
 			}
 		}
-		if (ky == RANK_Y(attackPos)){
-			for( j = 0; j < 2;++j){
-				p = row_move.RookCap[j] - colOffset;
-				if (p == FILE_X(attackPos) - colOffset)
-				{
-					Notify n = {"CHECKMATED"};
-					n.color = RED;
-					n.fontSize = 48;
-					NotifyManager::getInstance().Add(std::move(n));
-					rollback();
-					return false;
-				}			
+		if (ky == RANK_Y(attackPos))
+		{
+			if ((mskrow->wRookCap & (1 << (FILE_X(attackPos) - colOffset))) != 0)
+			{
+				return oppositeSide + i;
 			}
 		}
 	}
-	
+
 	// 检测炮将
-	for(i = CANNON_FROM;i <= CANNON_TO;++i){
+	for (i = CANNON_FROM; i <= CANNON_TO; ++i)
+	{
 		attackPos = Pieces[i + oppositeSide].alive;
-		if(attackPos == 0) continue;	
-		
-		if(kx == FILE_X(attackPos)){
-			for( j = 0; j < 2;++j){
-				p = col_move.CannonCap[j] - rowOffset;
-				if (p == RANK_Y(attackPos) - rowOffset)
-				{
-					Notify n = {"CHECKMATED"};
-					n.color = RED;
-					n.fontSize = 48;
-					NotifyManager::getInstance().Add(std::move(n));
-					rollback();
-					return false;
-				}		
+		if (attackPos == 0)
+			continue;
+
+		if (kx == FILE_X(attackPos))
+		{
+			if ((mskcol->wCannonCap & (1 << (RANK_Y(attackPos) - rowOffset))) != 0)
+			{
+				return oppositeSide + i;
 			}
 		}
 
-		if(ky == RANK_Y(attackPos)){
-			for( j = 0; j < 2;++j){
-				p = row_move.CannonCap[j] - colOffset;
-				if (p == FILE_X(attackPos) - colOffset)
-				{
-					Notify n = {"CHECKMATED"};
-					n.color = RED;
-					n.fontSize = 48;
-					NotifyManager::getInstance().Add(std::move(n));
-					rollback();
-					return false;
-				}			
+		if (ky == RANK_Y(attackPos))
+		{
+			if ((mskrow->wCannonCap & (1 << (FILE_X(attackPos) - colOffset)))!= 0)
+			{
+				return oppositeSide + i;
 			}
 		}
-
 	}
 
-	rollback();
-	return true;
+	return 0;
 }
 
-
-
 // 将死
-int Board::checkMated(int sqSrc,int sqDst,bool isCapture){
-	(void)sqSrc;
-	(void)sqDst;
-	(void)isCapture;	
-	return 0;
+bool Board::checkMated()
+{
+	int sqSrc,sqDst,sqSrcpt,sqDstpt,tp;
+	bool ischecked = true;
+	MoveSortStruct msvs;
+	this->GetAllMoves(&msvs);
+
+	for(int i = 0;i < msvs.allMoveNum;++i){
+		sqSrc = (int)msvs.mvsAll[i].Src;
+		sqDst = (int)msvs.mvsAll[i].Dst;	
+
+		sqSrcpt = Squares[sqSrc];
+		sqDstpt = Squares[sqDst]; // 如果非capture，为 0
+
+		this->SaveStatus(); //? 存储 evblack/red zobr
+		this->MakeMove(sqSrc,sqDst); //? 修改了Square wbitcol/row Piece bitpiece evblack/red zobr 
+		if(tp = checkMate(),tp != 0 && tp != NOKING){
+			this->RollbackMove(sqSrc,sqDst,sqSrcpt,sqDstpt); //? 恢复Square wbitcol/row Piece bitpiece
+			this->Rollback(); //? 恢复 evblack/red zobr 
+		}else{
+			ischecked = false;	
+			this->RollbackMove(sqSrc,sqDst,sqSrcpt,sqDstpt); //? 恢复Square wbitcol/row Piece bitpiece
+			this->Rollback(); //? 恢复 evblack/red zobr 
+			break;
+		}
+	}
+
+	return ischecked;
 }
 
 void Board::postMove()
 {
+	int pcCap,mv;
 	int sqSrc = moveAnim.sqSrc;
 	int sqDst = moveAnim.sqDst;
+	RollbackStruct *rbs;
 
-	// 0 ^ 1 = 1 添加目标位置
-	Pieces[Squares[sqSrc]].alive = sqDst;
-	Squares[sqDst] = Squares[sqSrc];
-	wBitCols[FILE_X(sqDst)] ^= ColMask(sqDst);
-	wBitRows[RANK_Y(sqDst)] ^= RowMask(sqDst);
-
-	// 1 ^ 1 = 0 删除原位置
-	Squares[sqSrc] = 0;
-	wBitCols[FILE_X(sqSrc)] ^= ColMask(sqSrc);
-	wBitRows[RANK_Y(sqSrc)] ^= RowMask(sqSrc);
-
+	this->SaveStatus();
+	mv = MOVE(sqSrc,sqDst);
+	pcCap = this->MakeMove(sqSrc,sqDst);
 	moveAnim.isAnimating = false;
 
-	this->changeSide();
+	if(ISMENUMODE){
+		this->activatedPos = {-1,-1};
+		this->mcs.state = MouseStateType::Idle;
+		return;
+	}
+
+	this->changeSideSimulation();
+
+	//! 这个是最终的行走,目前和搜索共用rblist,要确保搜索后清除所有记录
+	//! 只能先交换后再记录
+	rbs = rbsList + rbMoveNum;
+	rbs->mvs.Src = (uint8_t)sqSrc;
+	rbs->mvs.Dst = (uint8_t)sqDst;
+	rbs->mvs.ChkChs = checkMate();
+	rbs->Srcpt = Squares[sqDst]; // 此时已经是在 dst 位置
+	rbs->Dstpt = pcCap;
+	// DEBUG_((int)(rbs->mvs.ChkChs)," ",pcCap);
+  	if (pcCap == 0) { // 没有吃子
+    	if (rbs->mvs.ChkChs == 0) { // 也没有对对方将军
+			// 捉到的对方的子的类型,所属的阵营为mv的对面
+	      	rbs->mvs.ChkChs = -chasedBy(mv); //? 移动后造成的局面影响,为什么是负的?负表示被捉子
+    	}
+    	// if (LastMove().CptDrw == -100) {
+      	// 	lprbs->mvs.CptDrw = -100;
+    	// } else {
+      	// 	lprbs->mvs.CptDrw = std::min((int) LastMove().CptDrw, 0) - (lprbs->mvs.ChkChs > 0 || LastMove().ChkChs > 0 ? 0 : 1);
+    	// }
+    	// __ASSERT_BOUND(-100, lprbs->mvs.CptDrw, 0);
+		rbs->mvs.CptDrw = 0;
+  	} else {
+    	rbs->mvs.CptDrw = pcCap;
+    	__ASSERT_PIECE(pcCap); // 记录被吃子
+		disCardedPieces.push_back(pcCap);
+  	}
+	
+	DEBUG_("[Zobrist: ",zobr.dwKey, " ",zobr.dwLock0," ",zobr.dwLock1," ]");
+	rbMoveNum++;
+	lastmoveCur++;
+
+	// DEBUG_("rbmoveNUm & lastmoveIndex ",rbMoveNum," ",lastmoveCur);
+
+	// 目前和搜索共用rblist,要确保搜索后清除所有记录
+	assert(rbMoveNum == lastmoveCur);
+
+	if(isGameOver()){
+		return;
+	}
+
+	this->triggerSearch();
 }
 
-void Board::postCapture()
-{
-	int sqSrc = moveAnim.sqSrc;
-	int sqDst = moveAnim.sqDst;
-
-	Pieces[Squares[sqDst]].alive = 0;
-	Pieces[Squares[sqSrc]].alive = sqDst;
-
-	Squares[sqDst] = Squares[sqSrc];
-	// 目标位置还是有棋子,状态不变
-	// wBitCols[FILE_X(sqDst)] ^= ColMask(sqDst);
-	// wBitRows[RANK_Y(sqDst)] ^= RowMask(sqDst);
-
-	// 1 ^ 1 = 0 删除原位置
-	Squares[sqSrc] = 0;
-	wBitCols[FILE_X(sqSrc)] ^= ColMask(sqSrc);
-	wBitRows[RANK_Y(sqSrc)] ^= RowMask(sqSrc);
-
-	moveAnim.isAnimating = false;
-
-	this->changeSide();
-}
-
-void Board::preMove(bool fromDrag)
+void Board::preMove(bool fromDrag,Rectangle rec)
 {
 	if (activatedPos.x != -1 && activatedPos.y != -1)
 	{
@@ -1074,52 +1338,135 @@ void Board::preMove(bool fromDrag)
 		int pt = Squares[pos];
 
 		bool isValidPos = false;
-		bool error = false;
+		bool errorType = SUCCESS;
 
-		pieceCap(pt, pos, [this, &isValidPos, &error](int bx, int by)
-				 {
-					 float cx = this->binfo.BoardOriginX + bx * this->binfo.gridWidth;
-					 float cy = this->binfo.BoardOriginY + by * this->binfo.gridHeight;
-					 if (CheckCollisionPointCircle(this->mcs.dragMousePos, {cx, cy}, this->binfo.radius))
-					 {
-						 isValidPos = true;
-						 int sqSrc = SQpos(activatedPos.y, activatedPos.x);
-						 int sqDst = SQpos(by, bx);
+		float originX = this->binfo.BoardOriginX + activatedPos.x * this->binfo.gridWidth;
+		float originY = this->binfo.BoardOriginY + activatedPos.y * this->binfo.gridHeight;
 
-						 int sqSrcPiece = Squares[sqSrc];
-						 int sqDstPiece = Squares[sqDst];
+		// 原点
+		if(fromDrag && CheckCollisionPointCircle(this->mcs.dragMousePos, {originX, originY}, this->binfo.radius)){
+			this->mcs.state = MouseStateType::Selected;
+			return;
+		}
 
-						 if (sqDstPiece == 0)
-						 {
-							if(move(sqSrc, sqDst) != SUCCESS){
-								error = true;
-							}
-						 }
-						 else if ((sqDstPiece & (1 << 5)) != (sqSrcPiece & (1 << 5)))
-						 {
-							if(capture(sqSrc,sqDst) != SUCCESS){
-								error = true;
-							}
-						 }
-						 else{
-							// 同色和原点，这里先不处理
-								error = true;
-						 }
-					 } });
+		if(ISMENUMODE){
+			// todo 检测是否拖入了弃子区
+			if(CheckCollisionPointRec(this->mcs.dragMousePos,rec)){
+				// menuState 只需要管 Squares,其他状态都不需要
+				Squares[pos] = 0;
+				Pieces[pt].alive = 0;
+				disCardedPieces.push_back(pt);
+				activatedPos = {-1,-1};
+				this->mcs.state = MouseStateType::Idle;
+				return;
+			}
 
-		if (!isValidPos)
+			PieceFreePos(pt,[this,&isValidPos](int bx,int by,[[maybe_unused]] int debug){
+				float cx = this->binfo.BoardOriginX + bx * this->binfo.gridWidth;
+				float cy = this->binfo.BoardOriginY + by * this->binfo.gridHeight;
+
+				if (CheckCollisionPointCircle(this->mcs.dragMousePos, {cx, cy}, this->binfo.radius)){
+					isValidPos = true;
+					int sqSrc = SQpos(activatedPos.y, activatedPos.x);
+					int sqDst = SQpos(by, bx);
+					move(sqSrc,sqDst);
+				}
+			});
+
+
+			if (!isValidPos && fromDrag)
+			{
+				this->mcs.state = MouseStateType::Selected;
+			}
+			return;	
+		}
+
+		pieceCap(pt, pos, [this,&errorType,&isValidPos](int bx, int by,int debug){
+					float cx = this->binfo.BoardOriginX + bx * this->binfo.gridWidth;
+					float cy = this->binfo.BoardOriginY + by * this->binfo.gridHeight;
+					if (CheckCollisionPointCircle(this->mcs.dragMousePos, {cx, cy}, this->binfo.radius))
+					{
+						isValidPos = true;
+						int sqSrc = SQpos(activatedPos.y, activatedPos.x);
+						int sqDst = SQpos(by, bx);
+
+						int sqSrcPiece = Squares[sqSrc];
+						int sqDstPiece = Squares[sqDst];
+
+						if(debug){
+							isValidPos = false;
+							return;
+						}else{
+						 	if (sqDstPiece == 0)
+						 	{
+								errorType = move(sqSrc, sqDst);
+								if(errorType != SUCCESS){
+									isValidPos = false;
+								}
+						 	}
+						 	else if ((sqDstPiece & (1 << 5)) != (sqSrcPiece & (1 << 5)))
+						 	{
+								errorType = move(sqSrc, sqDst);
+								if(errorType != SUCCESS){
+									isValidPos = false;
+								}
+						 	}
+						 	else{
+								// 同色和原点
+								isValidPos = false;
+						 	}
+						}
+					}
+				});
+
+		if(errorType != SUCCESS){
+			if(errorType == CHECKMATED){
+				Notify n = {"CHECKMATED"};
+				n.color = RED;
+				n.fontSize = 36;
+				NotifyManager::getInstance().Add(std::move(n));
+			}
+		}else if(!isValidPos)
 		{
 			NotifyManager::getInstance().Add({"这不是一个有效位置"});
 		}
 
-		if ((!isValidPos || error) && fromDrag)
+		if (!isValidPos && fromDrag)
 		{
 			this->mcs.state = MouseStateType::Selected;
+		}
+
+	}else if(this->activatedDisCardedPos >= 0){
+		if(ISMENUMODE){
+			int pt = disCardedPieces[static_cast<size_t>(this->activatedDisCardedPos)]; 
+			bool isValidPos = false;
+
+			PieceFreePos(pt,[this,pt,&isValidPos](int bx,int by,[[maybe_unused]] int debug){
+				float cx = this->binfo.BoardOriginX + bx * this->binfo.gridWidth;
+				float cy = this->binfo.BoardOriginY + by * this->binfo.gridHeight;
+
+				if (CheckCollisionPointCircle(this->mcs.dragMousePos, {cx, cy}, this->binfo.radius)){
+					isValidPos = true;
+					int sqDst = SQpos(by, bx);
+
+					Squares[sqDst] = pt;
+					Pieces[pt].alive = sqDst;
+					disCardedPieces.erase(disCardedPieces.begin() + activatedDisCardedPos);
+					activatedDisCardedPos = -1;
+					this->mcs.state = MouseStateType::Idle;
+					return;
+				}
+			});
+
+			if (!isValidPos && fromDrag)
+			{
+				this->mcs.state = MouseStateType::Selected;
+			}
 		}
 	}
 }
 
-void Board::activateAnimation(int sqSrc, int sqDst, bool isCapture)
+void Board::activateAnimation(int sqSrc, int sqDst,std::function<void(void)> cb)
 {
 	moveAnim.progress = 0;
 	moveAnim.elapsedTime = 0;
@@ -1131,20 +1478,12 @@ void Board::activateAnimation(int sqSrc, int sqDst, bool isCapture)
 	moveAnim.startPos = screenXY(BOARD_X(sqSrc), BOARD_Y(sqSrc));
 	moveAnim.endPos = screenXY(BOARD_X(sqDst), BOARD_Y(sqDst));
 
-	if (isCapture)
+
+	moveAnim.onComplete = cb;
+	moveAnim.onComplete = [this]()
 	{
-		moveAnim.onComplete = [this]()
-		{
-			this->postCapture();
-		};
-	}
-	else
-	{
-		moveAnim.onComplete = [this]()
-		{
-			this->postMove();
-		};
-	}
+		this->postMove();
+	};
 }
 
 void Board::updateMoveAnimation(float frameTime)
@@ -1161,4 +1500,27 @@ void Board::updateMoveAnimation(float frameTime)
 			}
 		}
 	}
+}
+
+bool Board::isGameOver(){
+	int kingSqPos = isRedTurn ? Pieces[SIDE_TAG(0)].alive : Pieces[SIDE_TAG(1)].alive;
+	int oppositeSide = isRedTurn ? SIDE_TAG(1) : SIDE_TAG(0);
+	int opponentKingSqPos = Pieces[oppositeSide].alive;
+
+	if (kingSqPos == 0 || opponentKingSqPos == 0 || this->checkMated())
+	{
+		Notify n = {
+			.msg = "游戏结束",
+			.duration = 1000.0f,
+		};
+		NotifyManager::getInstance().Add(std::move(n));
+		this->gameOver = true;
+		this->mcs.state = MouseStateType::Idle;
+		return true;
+	}
+	return false;
+}
+
+void Board::discard(){
+
 }

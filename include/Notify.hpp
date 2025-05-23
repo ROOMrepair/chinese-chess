@@ -91,6 +91,10 @@ public:
             return;
         notifications.push_back(std::move(notify));
     }
+    
+    void Clear(){
+        notifications.clear();
+    }
 
     void Update(float deltaTime)
     {

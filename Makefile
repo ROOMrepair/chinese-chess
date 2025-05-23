@@ -61,10 +61,18 @@ else
 endif
 
 PROJECTS := chinese-chess raylib
-CPPFLAGS := -Wall -Wextra
+CPPFLAGS := -Wall -Wextra -Wno-unused-variable
 
 ifdef MYDEBUG
 	CPPFLAGS += -DMYDEBUG
+endif
+
+ifdef SUPERCAP
+	CPPFLAGS += -DSUPERCAP
+endif
+
+ifdef SHOW_EVAL
+	CPPFLAGS += -DSHOW_EVAL
 endif
 
 .PHONY: all clean help $(PROJECTS) run img_index
@@ -92,6 +100,10 @@ img_index: ./src/resource_index.cpp
 
 run_debug:
 	./bin/Debug/chinese-chess.exe
+
+test:
+	g++ ./src/test.cpp -o ./bin/Debug/test.exe -I./build/external/raylib-master/src \
+	./bin/Debug/raylib.lib -lwinmm -lgdi32 -lopengl32
 
 help:
 	@echo "Usage: make [config=name] [target]"
