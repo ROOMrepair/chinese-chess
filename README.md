@@ -1,6 +1,7 @@
 # Raylib-Quickstart
 A simple cross platform template for setting up a project with the bleeding edge raylib code.
 Works with C or C++.
+## go to: https://github.com/xqbase/eleeye
 
 ## Supported Platforms
 Quickstart supports the main 3 desktop platforms:
